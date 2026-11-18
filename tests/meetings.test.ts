@@ -120,7 +120,7 @@ test("the host removes a connection or ends the call for everyone", async () => 
     await t.as("ada").mutation(api.calls.join, { code: m.code });
     const g = await t.as("grace").mutation(api.calls.join, { code: m.code });
     await t.as("ada").mutation(api.calls.end, { code: m.code, peerId: g.peerId });
-    await assert.rejects(t.as("grace").mutation(api.calls.heartbeat, { peerId: g.peerId }), /no longer in this call/);
+    await assert.rejects(t.as("grace").mutation(api.calls.heartbeat, { peerId: g.peerId }), /removed from this call/);
     await t.as("ada").mutation(api.calls.end, { code: m.code });
     const state = await t.as("ada").query(api.meetings.get, { code: m.code });
     assert.equal(state.call, null);

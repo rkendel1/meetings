@@ -80,6 +80,9 @@ export const peers = app.collection(
     joinedAt: s.number(),
     lastSeenAt: s.number(),
     leftAt: s.optional(s.number()),
+    // Why the connection ended: left (pressed Leave or closed the tab), replaced (a refresh or a new tab of the
+    // same device took over), expired (stopped checking in), removed (by the host, or access was revoked), ended.
+    leftReason: s.optional(s.enum(["left", "replaced", "expired", "removed", "ended"] as const)),
     mic: s.boolean(),
     cam: s.boolean(),
     screen: s.boolean(),

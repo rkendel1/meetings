@@ -16,6 +16,9 @@ type Send = (toPeer: string, kind: "offer" | "answer", sdp: string) => Promise<u
 
 export type Remote = { peerId: string; stream: MediaStream; state: RTCPeerConnectionState };
 
+/** How long an offered connection may take to come up before it is offered again. */
+const OFFER_TIMEOUT_MS = 15_000;
+
 type Conn = { pc: RTCPeerConnection; stream: MediaStream; listed: boolean; createdAt: number };
 
 function iceServers(): RTCIceServer[] {
@@ -148,6 +151,11 @@ export class Mesh {
     await gathered(pc);
     if (this.conns.get(peerId)?.pc !== pc) return;
     await this.send(peerId, "offer", pc.localDescription!.sdp).catch((e) => console.warn("Offer not sent", e));
+    // An offer or answer can be lost (the other side reloaded, a send failed): offer again if this
+    // connection has not come up in time. The answering side replaces its connection on each offer.
+    setTimeout(() => {
+      if (!this.closed && this.conns.get(peerId)?.pc === pc && pc.connectionState !== "connected") void this.offer(peerId);
+    }, OFFER_TIMEOUT_MS);
   }
 
   private async answer(peerId: string, sdp: string) {

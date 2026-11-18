@@ -1,20 +1,29 @@
 import { fail, s } from "@feltdb/feltkit";
 import { app } from "./app.js";
-import { REACTIONS, append, latestCall, meetingFor, ownPeer, type Meeting } from "./_meeting.js";
+import { REACTIONS, append, callState, latestCall, meetingFor, ownPeer, type Meeting } from "./_meeting.js";
 
 const Posted = s.object({ id: s.string() });
 
+/**
+ * The running call a message belongs to. Posting into a running call needs presence in it (or being
+ * the host): nobody speaks into a call without being seen in it.
+ */
 async function openCallId(ctx: any, meeting: Meeting): Promise<string | undefined> {
   const call = await latestCall(ctx, meeting.id);
-  return call && call.endedAt === undefined ? call.id : undefined;
+  if (!call || call.endedAt !== undefined) return undefined;
+  const state = await callState(ctx, call, Date.now());
+  if (!state.open) return undefined;
+  const me = ctx.auth.requirePrincipal();
+  if (meeting.hostId !== me.id && !state.live.some((p) => p.principalId === me.id)) fail("FORBIDDEN", "Join the call to post in it.");
+  return call.id;
 }
 
 export const send = app.mutation({
   access: "chat.send",
-  args: { code: s.string(), text: s.string({ minLength: 1, maxLength: 4000 }) },
+  args: { code: s.string({ maxLength: 64 }), text: s.string({ minLength: 1, maxLength: 4000 }) },
   returns: Posted,
   retry: { sequenceConflicts: 5 },
-  capability: { name: "chat.send", description: "Post a chat message in the meeting (shown to everyone in the call, and kept in the recap)." },
+  capability: { name: "chat.send", description: "Post a chat message in the meeting (shown to everyone in the call, and kept in the recap). During a call, only those in it may post (join first)." },
   handler: async (ctx, { code, text }) => {
     const meeting = await meetingFor(ctx, code);
     if (!text.trim()) fail("INVALID_ARGUMENT", "Say something.");
@@ -24,7 +33,7 @@ export const send = app.mutation({
 
 export const react = app.mutation({
   access: "chat.react",
-  args: { code: s.string(), emoji: s.enum(REACTIONS) },
+  args: { code: s.string({ maxLength: 64 }), emoji: s.enum(REACTIONS) },
   returns: Posted,
   retry: { sequenceConflicts: 5 },
   capability: { name: "chat.react", description: `React in the call with one of ${REACTIONS.join(" ")}.` },
@@ -53,7 +62,7 @@ export const caption = app.mutation({
 /** A note for the recap: a summary, a decision, action items. Agents use this to report what they heard. */
 export const note = app.mutation({
   access: "notes.write",
-  args: { code: s.string(), text: s.string({ minLength: 1, maxLength: 4000 }) },
+  args: { code: s.string({ maxLength: 64 }), text: s.string({ minLength: 1, maxLength: 4000 }) },
   returns: Posted,
   retry: { sequenceConflicts: 5 },
   capability: { name: "notes.add", description: "Add a note to the meeting's recap (summary, decisions, action items). Shown in the call and in the recap." },

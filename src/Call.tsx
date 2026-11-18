@@ -10,6 +10,29 @@ type Entry = { id: string; seq: number; kind: "chat" | "caption" | "reaction" | 
 type Joined = { peerId: string; callId: string; callNumber: number };
 
 const REACTIONS = ["👍", "👏", "😂", "🎉", "❤️", "🤔"] as const;
+
+/** This tab's connection to a meeting, kept across a reload so the new page takes over from the old one. */
+function remembered(code: string): string | undefined {
+  try {
+    return sessionStorage.getItem(`meetings:peer:${code}`) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+function remember(code: string, peerId: string) {
+  try {
+    sessionStorage.setItem(`meetings:peer:${code}`, peerId);
+  } catch {
+    /* storage unavailable: a reload then shows the old tile until it expires */
+  }
+}
+function forget(code: string) {
+  try {
+    sessionStorage.removeItem(`meetings:peer:${code}`);
+  } catch {
+    /* ignore */
+  }
+}
 const HEARTBEAT_MS = 15_000;
 
 export function Call({ code, me, onError }: { code: string; me: Me; onError: (e: unknown) => void }) {
@@ -17,6 +40,7 @@ export function Call({ code, me, onError }: { code: string; me: Me; onError: (e:
   const [joined, setJoined] = useState<Joined | null>(null);
   const [left, setLeft] = useState<string | null>(null);
   const [media, setMedia] = useState<{ stream: MediaStream | null; mic: boolean; cam: boolean; error?: string }>({ stream: null, mic: true, cam: true });
+  const join = useMutation(api.calls.join);
 
   if (state.error && !state.data) {
     return (
@@ -44,14 +68,42 @@ export function Call({ code, me, onError }: { code: string; me: Me; onError: (e:
     );
   }
 
-  if (!joined) return <Lobby code={code} me={me} title={meeting.title} peers={state.data.peers as Peer[]} media={media} setMedia={setMedia} onJoined={setJoined} onError={onError} />;
-  return <Room code={code} me={me} meeting={meeting} isHost={meeting.hostId === me.id} joined={joined} peers={state.data.peers as Peer[]} callOpen={state.data.call?.id === joined.callId} initial={media} onLeft={setLeft} onError={onError} />;
+  const onJoined = (j: Joined) => {
+    remember(code, j.peerId);
+    setJoined(j);
+  };
+  if (!joined) return <Lobby code={code} me={me} title={meeting.title} peers={state.data.peers as Peer[]} media={media} setMedia={setMedia} onJoined={onJoined} onError={onError} />;
+  return (
+    <Room
+      key={joined.peerId}
+      code={code}
+      me={me}
+      meeting={meeting}
+      isHost={meeting.hostId === me.id}
+      joined={joined}
+      peers={state.data.peers as Peer[]}
+      callOpen={state.data.call?.id === joined.callId}
+      lostAccess={Boolean(state.error)}
+      initial={media}
+      onLeft={(why, final) => (final && forget(code), setLeft(why))}
+      onReconnect={async (kept) => {
+        // The connection expired (offline too long): join again with the same devices, as the same tab.
+        setMedia(kept);
+        try {
+          onJoined(await retrying(() => join({ code, replaces: joined.peerId, mic: kept.mic, cam: kept.cam })));
+        } catch (error) {
+          setLeft(describe(error));
+        }
+      }}
+      onError={onError}
+    />
+  );
 }
 
 /** Preview and choose devices, then join. */
 function Lobby(props: { code: string; me: Me; title: string; peers: Peer[]; media: { stream: MediaStream | null; mic: boolean; cam: boolean; error?: string }; setMedia: (m: { stream: MediaStream | null; mic: boolean; cam: boolean; error?: string }) => void; onJoined: (j: Joined) => void; onError: (e: unknown) => void }) {
   const join = useMutation(api.calls.join);
-  const [name, setName] = useState(props.me.name);
+  const name = props.me.name;
   const [busy, setBusy] = useState(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [audioId, setAudioId] = useState<string>("");
@@ -96,11 +148,11 @@ function Lobby(props: { code: string; me: Me; title: string; peers: Peer[]; medi
     setMedia({ ...media, [kind]: next });
   };
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const submit = async (e?: FormEvent) => {
+    e?.preventDefault();
     setBusy(true);
     try {
-      const j = await retrying(() => join({ code: props.code, name: name.trim() || undefined, mic: media.mic && Boolean(media.stream), cam: media.cam && Boolean(media.stream) }));
+      const j = await retrying(() => join({ code: props.code, mic: media.mic && Boolean(media.stream), cam: media.cam && Boolean(media.stream), replaces: remembered(props.code) }));
       handoff.current = true;
       props.onJoined(j);
     } catch (error) {
@@ -112,6 +164,16 @@ function Lobby(props: { code: string; me: Me; title: string; peers: Peer[]; medi
   const people = props.peers.filter((p) => p.kind === "person");
   const agents = props.peers.filter((p) => p.kind === "agent");
   const ready = Boolean(media.stream || media.error);
+
+  // A reload of a tab that was in this call goes straight back in, replacing its old connection.
+  const auto = useRef(Boolean(remembered(props.code)));
+  useEffect(() => {
+    if (ready && auto.current && !busy) {
+      auto.current = false;
+      void submit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   return (
     <div className="lobby">
@@ -145,7 +207,7 @@ function Lobby(props: { code: string; me: Me; title: string; peers: Peer[]; medi
           {people.length === 0 ? "No one is here yet. Joining starts the call." : `${people.map((p) => p.name).join(", ")} ${people.length === 1 ? "is" : "are"} in the call.`}
           {agents.length > 0 && ` ${agents.length} agent${agents.length === 1 ? "" : "s"} attending.`}
         </p>
-        <label className="field"><span>Your name in the call</span><input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} /></label>
+        <p className="muted small-text">You join as <b>{props.me.name}</b>.</p>
         <button className="primary big" disabled={busy || !ready}>{!ready ? "Starting camera…" : busy ? "Joining…" : people.length ? "Join now" : "Start the call"}</button>
         <button type="button" className="secondary" onClick={() => navigate({ page: "home" })}>Back</button>
       </form>
@@ -155,7 +217,7 @@ function Lobby(props: { code: string; me: Me; title: string; peers: Peer[]; medi
 
 type SpeechRecognitionLike = { continuous: boolean; interimResults: boolean; lang: string; start(): void; stop(): void; onresult: ((e: any) => void) | null; onend: (() => void) | null; onerror: ((e: any) => void) | null };
 
-function Room(props: { code: string; me: Me; meeting: { title: string; code: string; hostId: string; access: string }; isHost: boolean; joined: Joined; peers: Peer[]; callOpen: boolean; initial: { stream: MediaStream | null; mic: boolean; cam: boolean }; onLeft: (why: string) => void; onError: (e: unknown) => void }) {
+function Room(props: { code: string; me: Me; meeting: { title: string; code: string; hostId: string; access: string; invited: string[] }; isHost: boolean; joined: Joined; peers: Peer[]; callOpen: boolean; lostAccess: boolean; initial: { stream: MediaStream | null; mic: boolean; cam: boolean }; onLeft: (why: string, final: boolean) => void; onReconnect: (kept: { stream: MediaStream; mic: boolean; cam: boolean }) => void; onError: (e: unknown) => void }) {
   const { code, joined, peers } = props;
   const heartbeat = useMutation(api.calls.heartbeat);
   const leave = useMutation(api.calls.leave);
@@ -181,6 +243,8 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
   // Media mesh for this connection.
   useEffect(() => {
     const m = new Mesh(joined.peerId, (toPeer, kind, sdp) => sendSignal({ fromPeer: joined.peerId, toPeer, kind, sdp }), () => setTick((t) => t + 1));
+    // A lost camera or microphone (unplugged, revoked) turns that control off instead of sending a dead track.
+    for (const track of local.current.getTracks()) track.addEventListener("ended", () => lost(track));
     mesh.current = m;
     m.setTracks({ audio: local.current.getAudioTracks()[0] ?? null, video: local.current.getVideoTracks()[0] ?? null });
     local.current.getAudioTracks().forEach((t) => (t.enabled = mic));
@@ -189,7 +253,8 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
   }, [joined.peerId]);
 
   const people = peers.filter((p) => p.kind === "person");
-  const personIds = people.map((p) => p.id).join(",");
+  // Media goes to other people only: not to agents, and not between one person's own tabs or devices.
+  const personIds = people.filter((p) => p.principalId !== props.me.id || p.id === joined.peerId).map((p) => p.id).join(",");
   useEffect(() => {
     mesh.current?.sync(personIds ? personIds.split(",") : []);
   }, [personIds]);
@@ -201,12 +266,19 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
   }, [inbox.data, ack, joined.peerId]);
 
   // Presence: check in every 15 s and whenever what we share changes.
+  const [offline, setOffline] = useState(false);
   const beat = useCallback(async () => {
     if (done.current) return;
     try {
       await retrying(() => heartbeat({ peerId: joined.peerId, mic, cam, screen: Boolean(screen), hand }));
+      setOffline(false);
     } catch (error) {
-      if ((error as { code?: string }).code === "FAILED_PRECONDITION" || (error as { code?: string }).code === "NOT_FOUND") finish((error as Error).message.includes("ended") ? "The call has ended" : "You were removed from the call");
+      const e = error as { code?: string; message?: string; details?: { reason?: string } };
+      if (e.code === "FAILED_PRECONDITION" || e.code === "NOT_FOUND") {
+        const reason = e.details?.reason;
+        if (reason === "expired") return reconnect();
+        finish(e.message ?? "You are no longer in this call", true);
+      } else setOffline(true); // network trouble: keep the call up and keep trying
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heartbeat, joined.peerId, mic, cam, screen, hand]);
@@ -216,13 +288,19 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
     return () => clearInterval(timer);
   }, [beat]);
 
+  // The meeting refused us (access revoked): the heartbeat's answer says why, now rather than in 15 s.
+  useEffect(() => {
+    if (props.lostAccess) void beat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.lostAccess]);
+
   // The host ended the call, or this connection was removed.
   const mine = peers.find((p) => p.id === joined.peerId);
   const seenSelf = useRef(false);
   useEffect(() => {
     if (mine) seenSelf.current = true;
-    if (!props.callOpen && seenSelf.current) finish("The call has ended");
-    else if (!mine && seenSelf.current) finish("You were removed from the call");
+    if (!props.callOpen && seenSelf.current) finish("The call has ended", true);
+    else if (!mine && seenSelf.current) void beat(); // the heartbeat's answer says why (removed, expired, replaced)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.callOpen, Boolean(mine)]);
 
@@ -231,11 +309,29 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
     screen?.getTracks().forEach((t) => t.stop());
     mesh.current?.close();
   }
-  function finish(why: string) {
+  function finish(why: string, final: boolean) {
     if (done.current) return;
     done.current = true;
     stopAll();
-    props.onLeft(why);
+    props.onLeft(why, final);
+  }
+  function reconnect() {
+    if (done.current) return;
+    done.current = true;
+    mesh.current?.close();
+    screen?.getTracks().forEach((t) => t.stop());
+    props.onReconnect({ stream: local.current, mic, cam });
+  }
+  function lost(track: MediaStreamTrack) {
+    local.current.removeTrack(track);
+    if (track.kind === "video") {
+      setCam(false);
+      if (!screen) mesh.current?.setTracks({ video: null });
+    } else {
+      setMic(false);
+      mesh.current?.setTracks({ audio: null });
+    }
+    props.onError(new Error(`Your ${track.kind === "video" ? "camera" : "microphone"} disconnected.`));
   }
 
   // Leave when the tab closes or the user navigates away. (StrictMode's dev re-mount is not a departure:
@@ -243,16 +339,19 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
-    const bye = () => !done.current && void leave({ code, peerId: joined.peerId }).catch(() => {});
+    // Closing or reloading the tab: not final, so a reload rejoins the same call (it replaces this connection).
+    const bye = () => !done.current && void leave({ code, peerId: joined.peerId, final: false }).catch(() => {});
     window.addEventListener("pagehide", bye);
     return () => {
       mounted.current = false;
       window.removeEventListener("pagehide", bye);
       setTimeout(() => {
         if (mounted.current || done.current) return;
-        bye();
+        // Navigating away inside the app is leaving.
         done.current = true;
         stopAll();
+        forget(code);
+        void leave({ code, peerId: joined.peerId }).catch(() => {});
       }, 0);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -276,6 +375,7 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
       const track = s.getVideoTracks()[0]!;
       local.current.getVideoTracks().forEach((t) => (t.stop(), local.current.removeTrack(t)));
       local.current.addTrack(track);
+      track.addEventListener("ended", () => lost(track));
       if (!screen) mesh.current?.setTracks({ video: track });
       setCam(true);
     } catch (error) {
@@ -306,7 +406,7 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
     done.current = true;
     stopAll();
     await leave({ code, peerId: joined.peerId }).catch(() => {});
-    props.onLeft("You left the call");
+    props.onLeft("You left the call", true);
   };
   const endForAll = async () => {
     if (!confirm("End the call for everyone?")) return;
@@ -393,6 +493,7 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
           <strong>{props.meeting.title}</strong>
           <span className="muted small-text"><code>{code}</code> · call {joined.callNumber} · {people.length} {people.length === 1 ? "person" : "people"}{agents.length ? `, ${agents.length} agent${agents.length === 1 ? "" : "s"}` : ""}</span>
         </div>
+        {offline && <span className="badge offline-badge" role="status">Connection lost: reconnecting…</span>}
         <button className="secondary small" onClick={() => void navigator.clipboard?.writeText(location.href)}>Copy link</button>
       </div>
 
@@ -432,7 +533,12 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
             </div>
             {panel === "chat" && <ChatPanel code={code} entries={entries.filter((e) => e.kind === "chat" || e.kind === "note" || e.kind === "system")} onError={props.onError} />}
             {panel === "captions" && <Transcript entries={entries.filter((e) => e.kind === "caption")} supported={Boolean(SpeechRecognition)} on={captionsOn} toggle={() => setCaptionsOn(!captionsOn)} />}
-            {panel === "people" && <People peers={peers} me={joined.peerId} isHost={props.isHost} remotes={remotes} onRemove={(id) => void end({ code, peerId: id }).catch(props.onError)} />}
+            {panel === "people" && (
+              <>
+                {props.isHost && <AccessEditor code={code} meeting={props.meeting} onError={props.onError} />}
+                <People peers={peers} me={joined.peerId} isHost={props.isHost} remotes={remotes} onRemove={(id) => void end({ code, peerId: id }).catch(props.onError)} />
+              </>
+            )}
             {panel === "agents" && <AgentsPanel code={code} agents={agents} access={props.meeting.access} />}
           </aside>
         )}
@@ -580,6 +686,36 @@ function People({ peers, me, isHost, remotes, onRemove }: { peers: Peer[]; me: s
         ))}
       </ul>
     </div>
+  );
+}
+
+/** The host changes who may attend. Whoever loses access leaves the call at once (enforced on the server). */
+function AccessEditor({ code, meeting, onError }: { code: string; meeting: { access: string; invited: string[] }; onError: (e: unknown) => void }) {
+  const update = useMutation(api.meetings.update);
+  const [access, setAccess] = useState(meeting.access as "link" | "invited");
+  const [invited, setInvited] = useState(meeting.invited.join(", "));
+  const [saved, setSaved] = useState(false);
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      await retrying(() => update({ code, access, invited: invited.split(/[\s,]+/).filter(Boolean) }));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      onError(error);
+    }
+  };
+  return (
+    <form className="panel-note stack" onSubmit={save}>
+      <label className="field"><span>Who can join</span>
+        <select value={access} onChange={(e) => setAccess(e.target.value as "link" | "invited")}>
+          <option value="link">Anyone signed in with the link</option>
+          <option value="invited">Only invited people and agents</option>
+        </select>
+      </label>
+      <label className="field"><span>Invited ids</span><input value={invited} onChange={(e) => setInvited(e.target.value)} placeholder="grace, claude" /></label>
+      <button className="secondary small">{saved ? "Saved" : "Save access"}</button>
+    </form>
   );
 }
 

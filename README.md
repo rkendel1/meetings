@@ -1,5 +1,8 @@
 # meetings
 
+> Status: a working MVP, not production-ready. [AUDIT.md](AUDIT.md) has the feature matrix against the
+> reference, security findings, reliability results, platform analysis and the P0/P1/P2 register.
+
 Video meetings in the browser that **people and agents attend together**, built with
 [FeltKit](https://www.npmjs.com/package/@feltdb/feltkit) (`npm create feltkit@latest meetings`).
 It is a FeltKit counterpart of [convex-meetings](https://github.com/saranatour1/convex-meetings)
@@ -12,8 +15,10 @@ first-class participant with its own identity and permissions, not a browser gue
   with the link* or *only the people and agents I invite*. Optional scheduled time.
 - **Calls**: lobby with camera/mic preview and device pickers; video, audio, mute, camera on/off,
   **screen share** (stage layout), raise hand, six emoji reactions, several tabs/devices per person.
-  The first person to join starts the call; it ends when the last *person* leaves (agents never keep a
-  call open), or when the host ends it for everyone. The host can remove a connection.
+  The first person to join starts the call. Pressing Leave as the last *person* ends it; if the last
+  person's tab closes or crashes, it ends after a 60 s grace period, so a page reload rejoins the same
+  call. Agents never keep a call open. The host can remove a connection, end the call for everyone, and
+  change who may attend (People tab); whoever loses access leaves the call at once.
 - **Chat** and **live captions** (each person's browser transcribes its own speech with the Web
   Speech API, Chrome/Edge), kept in one ordered timeline per meeting.
 - **Recaps** per call: start/end, attendance per person and agent (with devices and minutes), notes,
@@ -21,7 +26,8 @@ first-class participant with its own identity and permissions, not a browser gue
 - **Agents attend over MCP** (served at `/mcp`): `meetings_list`, `meetings_get`, `meetings_join`
   (presence, shown as an *AI agent* tile), `meetings_feed` (follow chat and captions with a cursor),
   `chat_send`, `chat_react`, `notes_add` (summary/action items into the recap), `meetings_recap`,
-  `meetings_leave`. Agents carry no media; they read what was said as text.
+  `meetings_leave`. Agents carry no media; they read what was said as text, and must be visibly in a
+  running call to read or post in it.
 
 ## Run it
 
@@ -63,21 +69,24 @@ keys hold the `agent` role.
 | Path | What it is |
 |---|---|
 | `feltkit/app.ts` | Roles (`member`, `agent`, `admin`), dev users, services, and the collections: `meetings`, `calls`, `peers`, `signals`, `entries` |
-| `feltkit/_meeting.ts` | Meeting rules: access, liveness (45 s without a check-in = gone), settling a call, the per-meeting timeline sequence |
+| `feltkit/_meeting.ts` | Meeting rules: access, who may read a call, connection ownership, the per-meeting timeline |
+| `feltkit/_presence.ts` | Presence: liveness (45 s without a check-in = gone), the 60 s grace period, settling a call |
 | `feltkit/meetings.ts` | `list`, `create`, `update`, `get`, `feed`, `recap` |
 | `feltkit/calls.ts` | `join`, `heartbeat`, `leave`, `end` (host) |
 | `feltkit/chat.ts` | `send`, `react`, `caption`, `note` |
 | `feltkit/signals.ts` | WebRTC signaling: `send`, `inbox` (live), `ack` |
 | `src/rtc.ts` | The browser media mesh |
 | `src/Call.tsx`, `src/Recap.tsx`, `src/Home.tsx` | Screens |
-| `tests/meetings.test.ts` | Backend tests (people, agents, access, host controls, durability across restart) |
-| `scripts/e2e.mjs` | Browser test against a running dev server: two people with fake cameras + an agent over MCP |
+| `tests/meetings.test.ts`, `tests/audit.test.ts` | Backend tests: people, agents, access and revocation, unauthorized attempts, concurrency, presence expiry with a controlled clock |
+| `scripts/e2e.mjs` | Browser scenarios against a running dev server: media, reload, network drops, denied permissions, device loss, revocation, host crash, agents over MCP, replay |
+| `feltkit.measure.json` | Classifies the app-built infrastructure for `npx feltkit measure` |
 
 **State.** Everything durable is in the app's one FeltDB instance: meetings, calls, who attended and
-when, chat, captions, notes, reactions. Liveness is a `lastSeenAt` each connection refreshes every 15 s;
-a call is settled (stale connections marked left at their last check-in, the call ended at the last
-person's) by the next join, leave or check-in, so no background scheduler is needed and end times are
-accurate.
+when (and why each connection ended), chat, captions, notes, reactions. Liveness is a `lastSeenAt` each
+connection refreshes every 15 s; a call is settled (stale connections marked expired at their last
+check-in, the call ended when no person is left and the grace period has passed) by the next join, leave
+or check-in, so no background scheduler is needed. A reloaded tab hands over from its previous
+connection (`replaces`, kept in `sessionStorage`), and an expired connection rejoins by itself.
 
 **Media.** Audio and video go browser to browser over WebRTC, in a full mesh. FeltDB carries only the
 signaling: each pair exchanges one offer and one answer (ICE gathered up front), and the smaller peer id
@@ -86,10 +95,12 @@ transceiver from the start; camera off and screen share swap the outgoing track 
 STUN defaults to Google's public server; set `VITE_ICE_SERVERS` (JSON `RTCIceServer[]`) for your own
 STUN/TURN.
 
-**Authority.** Roles decide every call on every interface (app, AppPort, MCP). People (`member`) create
-meetings, join with media, caption, chat. Agents (`agent`) may read meetings they are allowed into,
-attend, chat, react and add notes; they cannot create or host meetings, caption, or send media
-signaling. Per-meeting access (link vs. invited) is checked in every function.
+**Authority.** Roles decide every call on every interface (app, AppPort, MCP). People are principals of
+type `user`; every other principal (agent sessions, API keys, services) is an agent, whatever its roles.
+People (`member`) create meetings, join with media, caption, chat. Agents (`agent`) may read meetings they
+are allowed into, attend, chat, react and add notes; they cannot create or host meetings, caption, or
+send media signaling. Per-meeting access (link vs. invited) is checked in every function, and names in
+the call and recap always come from the principal, never from the request.
 
 ## Tests
 
@@ -98,10 +109,12 @@ npm test
 ```
 
 ```bash
-AGENT_TOKEN=<token from feltkit session create> node scripts/e2e.mjs http://localhost:3000
+node scripts/e2e.mjs http://localhost:3000
 ```
 
-The e2e script needs `npm run dev` running and Playwright with Chromium installed.
+The e2e script needs `npm run dev` running and Playwright with Chromium installed; it creates its own
+agent sessions. It takes about 3 minutes (`SKIP_SLOW=1` skips the two presence-expiry scenarios). It
+expects one known platform gap: MCP drops idempotency keys (AUDIT.md, G1).
 
 ## Not built (compared with convex-meetings)
 

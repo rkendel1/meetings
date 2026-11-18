@@ -1,0 +1,8 @@
+{
+  "classify": [
+    { "path": "feltkit/_presence.ts", "class": "infrastructure", "reason": "presence leases and lazy call settlement: FeltDB has no TTL/leases and live queries do not re-run on time" },
+    { "path": "feltkit/signals.ts", "class": "infrastructure", "reason": "WebRTC signaling relayed through durable records: AppPort events are not usable yet (FeltKit UPSTREAM-GAPS A8)" },
+    { "path": "src/rtc.ts", "class": "infrastructure", "reason": "browser media transport (WebRTC mesh); the boundary an SFU would replace" },
+    { "path": "scripts/e2e.mjs", "class": "tests", "reason": "browser end-to-end and failure-condition acceptance script" }
+  ]
+}

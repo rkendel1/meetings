@@ -208,3 +208,4 @@ button.round.danger { background: #d92d20; color: #fff; width: 58px; border-radi
   .grid.n2, .grid.n3, .grid.n4 { grid-template-columns: 1fr; }
   button.round { width: 42px; height: 42px; }
 }
+.offline-badge { background: #78350f; color: #fde68a; }
