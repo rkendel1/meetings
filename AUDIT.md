@@ -291,3 +291,155 @@ node scripts/e2e.mjs                 # 14 scenarios (~3 min); SKIP_SLOW=1 skips 
 
 Expected E2E summary: `13/14 scenarios passed, 1 known platform gap(s), 0 failure(s)`. The known gap
 is G1 and turns into a pass when FeltKit forwards MCP `_meta`.
+
+---
+
+# Phase 3: platform and network validation (2026-11-18)
+
+Application changes are in this repository; platform changes are on `rkendel1/feltkit`, branch
+`claude/gallant-cannon-k8j6e9`, each with its own tests. Nothing in the application works around a
+platform defect.
+
+## Completion criteria
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| No known P0 security defects | Met (open items are P1, below) | 23 backend tests incl. `tests/signaling.test.ts`, `tests/media.test.ts`; termination measurements |
+| MCP idempotency works | **Met with the FeltKit fix** | FeltKit `test/mcp-idempotency.test.ts` (5 tests; 0/5 pass without the fix); app E2E "MCP: a replayed tools/call…" passes on the fixed build, reported as a known gap on published 0.3.32 |
+| Media termination verified | Met, with a measured bound for session end | `scripts/e2e-termination.mjs`, 7/7 |
+| Cross-network calls demonstrated | Met in an emulated network; **not on real independent networks** | `scripts/netlab/run.sh`: 4/5 scenarios as expected, 1 open |
+| Rate limiting tested | Met for signaling | `tests/signaling.test.ts` |
+| Platform changes have independent tests | Met | FeltKit `test/mcp-idempotency.test.ts`, `test/measure.test.ts`, `test/presence-contract.test.ts` (todo) |
+| Application and platform builds pass | Met | commands at the end |
+| Ownership measurements recorded | Met | below |
+
+## Track A: meetings
+
+### Media termination (scripts/e2e-termination.mjs)
+
+Measured from instrumented browsers: when the participant's own peer connections and camera/mic tracks
+stop, and when every other browser has closed its connection to them. "Adversarial" = a client that ignores
+`close()` and `track.stop()`.
+
+| Authorization ends by | Own media stops | Others' connection closed | Adversarial: others closed |
+|---|---|---|---|
+| Host revokes access (invite-only, removed from list) | 255 ms | 254 ms | 254 ms |
+| Host removes the connection | 257 ms | 257 ms | 254 ms |
+| Sign-out in another tab of the same browser | 11.9 s | 50.5 s | — |
+| Session revoked from another device | 11.1 s | 49.8 s | 56.4 s |
+
+Fixed in this phase: a heartbeat answered `UNAUTHORIZED` used to be treated as a network drop (media kept
+running); it now ends the call in that browser. **Open (P1, platform P1 presence):** after a session ends,
+others learn it only when the presence expires (~50–56 s), so a hostile client keeps media flowing for that
+long. Meeting-level revocation is immediate and enforced without the client's cooperation.
+
+### TURN with short-lived credentials
+
+`feltkit/app.ts` declares `app.integration("turn")` against a TURN provider's credential API (Cloudflare
+Realtime's `generate-ice-servers` shape). The provider token is in FeltKit's credential custody
+(`credential-ref:turn`, production `FELTKIT_CREDENTIAL_TURN`); the operation is not exposed as a capability.
+`media:iceServers` gives relay credentials (4 h TTL) only to a person with a live connection
+(`tests/media.test.ts`). Development uses `scripts/turn-api-dev.mjs` in front of coturn (coturn REST
+credentials, HMAC-SHA1, checked by coturn: an unauthenticated allocation gets 401, the issued credential
+allocates).
+
+### Cross-network calls (scripts/netlab)
+
+Two sites, each behind its own NAT router (network namespaces + iptables), on an emulated internet with
+coturn; one browser per site; the app's real ICE configuration. `RUNS=2 scripts/netlab/run.sh`:
+
+| Scenario | Expected | Result (2 runs each) |
+|---|---|---|
+| Full-cone NATs (RFC 4787 EIM/EIF), STUN only | direct | ✅ srflx↔srflx, ~0.6 s, video both ways |
+| Linux MASQUERADE NATs, STUN only | none | ✅ fails, as expected (see finding 1) |
+| Symmetric NATs, STUN only | none | ✅ fails, as expected |
+| Symmetric NATs, TURN | relay | ✅ relay/udp ↔ prflx, ~0.6 s, video both ways |
+| Symmetric NATs, all UDP blocked at one site, TURN | relay over TCP | **open**: fails (finding 3) |
+
+Findings:
+1. **Plain Linux MASQUERADE defeats hole punching** when the peer's first packet arrives before the site's
+   own (conntrack takes the mapping; the outbound packets leave on another port). Proven with packet
+   captures and conntrack. Many Linux-based routers behave this way: TURN is needed more often than "cone
+   NAT" suggests.
+2. **A third-party STUN hostname that does not resolve broke relay connectivity** in the app: 0/3 with
+   Google's STUN in the ICE list, 5/5 without. The app now uses only the provider's servers (also a privacy
+   improvement: no third party learns participants' addresses). The Chrome-internal mechanism was not
+   determined; a bare two-browser harness with the same list connected.
+3. **TURN over TCP with all UDP blocked:** Chrome gathers the TCP relay candidate but forms no pairs with it,
+   in the app and in a bare two-browser `RTCPeerConnection` alike. Not an app defect; unresolved. Next: test
+   TURNS on 443 against a production provider.
+4. Lab artefact found and removed: Chrome sends TURN-over-TCP through the host's configured HTTPS proxy
+   (`ERR_PROXY_CONNECTION_FAILED`); the lab's browsers run with `--no-proxy-server`.
+
+**Not done: independently located browsers on real networks.** This sandbox has no second machine or
+network; the lab emulates NAT types on one host. Real-network testing needs the app deployed publicly and
+browsers on separate networks (home, mobile, corporate), which is the remaining blocker for this criterion.
+
+### Signaling limits (tests/signaling.test.ts)
+
+Roles enforced on the server (smaller connection offers, larger answers); one pending signal of each kind
+per pair (a newer one replaces it); 60 signals a minute per connection (`RATE_LIMITED` with `retryAfterMs`);
+SDP must be a session description of at most 64 kB; no relay to agents, other calls, departed or revoked
+connections; foreign inbox reads return nothing and foreign acks delete nothing.
+
+### Capacity (scripts/capacity.mjs; real accounts; this host: 4 vCPU Xeon 2.1 GHz)
+
+| N | Connected | Video streams | fps min / median | Uplink per person | Host CPU | |
+|---|---|---|---|---|---|---|
+| 2 | 3.3 s | 2/2 | 20 / 20 | 611 kbps | 21% | usable |
+| 3 | 3.4 s | 6/6 | 17.6 / 18.4 | 1078 kbps | 72% | usable |
+| 4 | 4.5 s | 12/12 | 6 / 7.3 | 629 kbps | 99% | not usable |
+| 5 | 5.2 s | 20/20 | 2 / 5.1 | 624 kbps | 100% | not usable |
+| 6 | 6.5 s | 30/30 | 0.8 / 4.1 | 556 kbps | 100% | not usable |
+
+Signaling and connection set-up scale (30/30 streams connected in 6.5 s at N=6). The limit measured here is
+the host's CPU, because every participant runs on it: **3 people on this host**. This replaces the earlier
+"4–6" estimate. On separate devices each person carries only their own N−1 encodes and decodes; the same
+harness run on separate machines is what establishes that number.
+
+### Session expiry, cleanup, reconnection
+
+`scripts/e2e-session-expiry.mjs` (agent session with a 36 s TTL, checking in every 10 s): refused at its first
+check-in after expiry (+7 s, 401); its tile disappeared 60 s after its last successful check-in (45 s
+presence + one settle); the recap records it leaving at its last check-in. Reconnection (reload, 8 s drop,
+62 s drop with automatic rejoin, host crash) remains covered by `scripts/e2e.mjs`, 14/14 on the fixed
+FeltKit.
+
+## Track B: FeltKit (rkendel1/feltkit, branch claude/gallant-cannon-k8j6e9)
+
+| Item | Change | Package | Test |
+|---|---|---|---|
+| MCP idempotency | `/mcp` forwards `params._meta` (idempotency key, timeout, trace) to AppPort; malformed `_meta` → JSON-RPC -32602 | `@feltdb/feltkit` `src/server/mcp.ts` | `test/mcp-idempotency.test.ts`: 5 pass with the fix, 0 without |
+| Measure ownership | detectors `presence-lease`, `transient-relay`, `media-transport` (platform-gap candidates) and check *app-built infrastructure has an owner* | `src/measure/index.ts`, `docs/MEASURE.md` | `test/measure.test.ts` (11 pass) |
+| Presence, transient messages, quotas | proposal with gap, evidence, contract, owner, regression tests | `docs/PRESENCE-AND-SIGNALING-PROPOSAL.md` | `test/presence-contract.test.ts` (10 todo) |
+| Existing capabilities verified | workspaces, invitations, scoped data, removal, notifications; accounts end to end | (no platform change) | app `tests/platform-capabilities.test.ts`, `scripts/e2e-identity.mjs` |
+
+Also found: an expired agent session is refused with a message that reads as a missing token; `feltkit dev`
+once stopped reloading a function module until restarted (not yet reduced to a reproduction).
+
+## Ownership (patched `feltkit measure`, with this repository's declarations)
+
+| Class | Files | Lines |
+|---|--:|--:|
+| domain | 6 | 502 |
+| experience | 8 | 1457 |
+| infrastructure (app-owned) | 5 | 326 |
+| configuration | 3 | 81 |
+| tests (incl. acceptance, capacity, lab) | 14 | ~1,600 |
+
+App-owned infrastructure is `feltkit/_presence.ts` (presence + the `peers` collection), `feltkit/signals.ts`
+(relay + the `signals` collection + limits), `feltkit/media.ts` (ICE issuing), `src/rtc.ts` (mesh), and the
+development TURN stand-in. P1 (presence) and P2 (transient messages) would remove the first two; P3 the limit
+code. Without declarations, the patched `measure` now finds all three kinds and fails `--check` until they are
+owned; published 0.3.32 found none.
+
+## Remaining blockers and open items
+
+- **Real-network calls** (independent locations, mobile, corporate firewalls): needs a public deployment
+  and devices outside this sandbox.
+- **TURN over TCP when UDP is fully blocked:** open (finding 3); next step TURNS:443 with a production provider.
+- **Session-end media exposure (~50–56 s against a hostile client):** needs platform P1 (session-bound presence).
+- **Chat and reaction rate limits:** none yet; better as platform P3 than as more app counters.
+- **Capacity on real devices:** run `scripts/capacity.mjs` per device class; this host measures 3.
+- **TURN credential scope:** relay credentials are valid for 4 h for whoever holds them; shorter TTL with
+  renewal (`RTCPeerConnection.setConfiguration`) narrows reuse.

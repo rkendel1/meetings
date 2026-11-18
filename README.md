@@ -92,8 +92,12 @@ connection (`replaces`, kept in `sessionStorage`), and an expired connection rej
 signaling: each pair exchanges one offer and one answer (ICE gathered up front), and the smaller peer id
 always offers, so there are no negotiation races. Each connection has one audio and one video
 transceiver from the start; camera off and screen share swap the outgoing track without renegotiating.
-STUN defaults to Google's public server; set `VITE_ICE_SERVERS` (JSON `RTCIceServer[]`) for your own
-STUN/TURN.
+Relay (TURN) credentials come from a TURN provider's API through
+`app.integration("turn")` (`feltkit/app.ts`): the provider's token stays in FeltKit's credential custody
+(`FELTKIT_CREDENTIAL_TURN`, `TURN_API_URL` for the key's URL, e.g. Cloudflare Realtime), and only a person in a
+live call gets short-lived credentials (`media:iceServers`). Without a provider, calls use STUN only and
+fail across strict NATs. In development, `node scripts/turn-api-dev.mjs` stands in for the provider in
+front of a local coturn. Signaling is limited per connection (60/min, one pending signal per pair, 64 kB).
 
 **Authority.** Roles decide every call on every interface (app, AppPort, MCP). People are principals of
 type `user`; every other principal (agent sessions, API keys, services) is an agent, whatever its roles.
@@ -113,7 +117,11 @@ node scripts/e2e.mjs http://localhost:3000
 ```
 
 The e2e script needs `npm run dev` running and Playwright with Chromium installed; it creates its own
-agent sessions. It takes about 3 minutes (`SKIP_SLOW=1` skips the two presence-expiry scenarios). It
+agent sessions. More scripts against the running app: `npm run e2e:termination` (media stops when
+authorization ends, measured), `npm run e2e:expiry` (session expiry and cleanup), `npm run e2e:identity`
+(accounts), `npm run capacity` (N-person calls, measured), and `sudo scripts/netlab/run.sh` (calls between
+two NATed sites with coturn; needs root, iproute2, iptables, coturn, and the dev server started with
+`FELTKIT_CREDENTIAL_TURN=netlab-token`). It takes about 3 minutes (`SKIP_SLOW=1` skips the two presence-expiry scenarios). It
 expects one known platform gap: MCP drops idempotency keys (AUDIT.md, G1).
 
 ## Not built (compared with convex-meetings)
