@@ -13,7 +13,9 @@
     "typecheck": "tsc --noEmit",
     "e2e": "node scripts/e2e.mjs",
     "e2e:termination": "node scripts/e2e-termination.mjs",
-    "netlab": "sudo scripts/netlab/run.sh"
+    "netlab": "sudo scripts/netlab/run.sh",
+    "e2e:expiry": "node scripts/e2e-session-expiry.mjs",
+    "capacity": "node scripts/capacity.mjs"
   },
   "dependencies": {
     "@feltdb/feltkit": "^0.3.32",
