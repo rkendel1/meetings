@@ -26,13 +26,15 @@ test("people start, share and end a call; the recap keeps attendance and the tim
     await t.as("ada").mutation(api.chat.react, { code: m.code, emoji: "🎉" });
 
     // Signaling: only between connections in the same call, read only by the recipient.
-    await t.as("ada").mutation(api.signals.send, { fromPeer: a.peerId, toPeer: g.peerId, kind: "offer", sdp: "v=0" });
-    await assert.rejects(t.as("grace").mutation(api.signals.send, { fromPeer: a.peerId, toPeer: g.peerId, kind: "offer", sdp: "v=0" }), /not your connection/);
-    const inbox = await t.as("grace").query(api.signals.inbox, { peerId: g.peerId });
+    const SDP = "v=0\r\no=- 1 1 IN IP4 0.0.0.0\r\ns=-\r\nt=0 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n";
+    const [lo, hi] = a.peerId < g.peerId ? [{ who: "ada", id: a.peerId }, { who: "grace", id: g.peerId }] : [{ who: "grace", id: g.peerId }, { who: "ada", id: a.peerId }];
+    await t.as(lo.who).mutation(api.signals.send, { fromPeer: lo.id, toPeer: hi.id, kind: "offer", sdp: SDP });
+    await assert.rejects(t.as(hi.who).mutation(api.signals.send, { fromPeer: lo.id, toPeer: hi.id, kind: "offer", sdp: SDP }), /not your connection/);
+    const inbox = await t.as(hi.who).query(api.signals.inbox, { peerId: hi.id });
     assert.equal(inbox.length, 1);
-    assert.deepEqual(await t.as("ada").query(api.signals.inbox, { peerId: g.peerId }), []);
-    await t.as("grace").mutation(api.signals.ack, { peerId: g.peerId, ids: [inbox[0].id] });
-    assert.equal((await t.as("grace").query(api.signals.inbox, { peerId: g.peerId })).length, 0);
+    assert.deepEqual(await t.as(lo.who).query(api.signals.inbox, { peerId: hi.id }), []);
+    await t.as(hi.who).mutation(api.signals.ack, { peerId: hi.id, ids: [inbox[0].id] });
+    assert.equal((await t.as(hi.who).query(api.signals.inbox, { peerId: hi.id })).length, 0);
 
     assert.deepEqual(await t.as("grace").mutation(api.calls.leave, { code: m.code, peerId: g.peerId }), { callEnded: false });
     assert.deepEqual(await t.as("ada").mutation(api.calls.leave, { code: m.code, peerId: a.peerId }), { callEnded: true });

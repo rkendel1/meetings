@@ -242,7 +242,8 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
 
   // Media mesh for this connection.
   useEffect(() => {
-    const m = new Mesh(joined.peerId, (toPeer, kind, sdp) => sendSignal({ fromPeer: joined.peerId, toPeer, kind, sdp }), () => setTick((t) => t + 1));
+    // Concurrent writes are retried; RATE_LIMITED is not (the mesh offers again after its timeout).
+    const m = new Mesh(joined.peerId, (toPeer, kind, sdp) => retrying(() => sendSignal({ fromPeer: joined.peerId, toPeer, kind, sdp })), () => setTick((t) => t + 1));
     // A lost camera or microphone (unplugged, revoked) turns that control off instead of sending a dead track.
     for (const track of local.current.getTracks()) track.addEventListener("ended", () => lost(track));
     mesh.current = m;

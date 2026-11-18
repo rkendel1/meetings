@@ -51,7 +51,7 @@ test("revoking an invitation removes the person from the live call and stops the
     const g = await t.as("grace").mutation(api.calls.join, { code: m.code });
     await t.as("ada").mutation(api.meetings.update, { code: m.code, invited: [] });
     await assert.rejects(t.as("grace").mutation(api.calls.heartbeat, { peerId: g.peerId }), (e) => ["FAILED_PRECONDITION", "NOT_FOUND"].includes(code(e)));
-    await assert.rejects(t.as("grace").mutation(api.signals.send, { fromPeer: g.peerId, toPeer: a.peerId, kind: "offer", sdp: "x" }));
+    await assert.rejects(t.as("grace").mutation(api.signals.send, { fromPeer: g.peerId, toPeer: a.peerId, kind: g.peerId < a.peerId ? "offer" : "answer", sdp: "v=0\r\nm=audio 9 x\r\n" }), (e) => ["FAILED_PRECONDITION", "NOT_FOUND"].includes(code(e)));
     await assert.rejects(t.as("grace").query(api.meetings.get, { code: m.code }), (e) => code(e) === "NOT_FOUND");
     const state = await t.as("ada").query(api.meetings.get, { code: m.code });
     assert.deepEqual(state.peers.map((p: any) => p.principalId), ["ada"]);
@@ -95,7 +95,7 @@ test("agents are refused every person-only and host-only operation, on the serve
       ["end call", () => t.as(claude).mutation(api.calls.end, { code: m.code })],
       ["remove a person", () => t.as(claude).mutation(api.calls.end, { code: m.code, peerId: a.peerId })],
       ["caption", () => t.as(claude).mutation(api.chat.caption, { peerId: c.peerId, code: m.code, text: "fake words" })],
-      ["send signaling", () => t.as(claude).mutation(api.signals.send, { fromPeer: c.peerId, toPeer: a.peerId, kind: "offer", sdp: "x" })],
+      ["send signaling", () => t.as(claude).mutation(api.signals.send, { fromPeer: c.peerId, toPeer: a.peerId, kind: "offer", sdp: "v=0\r\nm=audio 9 x\r\n" })],
       ["read signaling", () => t.as(claude).query(api.signals.inbox, { peerId: c.peerId })],
       ["heartbeat someone else's connection", () => t.as(claude).mutation(api.calls.heartbeat, { peerId: a.peerId })],
     ];

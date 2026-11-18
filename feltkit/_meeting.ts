@@ -10,7 +10,7 @@ type Principal = { id: string; type: string; displayName?: string };
 export type LeftReason = "left" | "replaced" | "expired" | "removed" | "ended";
 export type Meeting = { id: string; code: string; title: string; hostId: string; hostName: string; access: "link" | "invited"; invited: string[]; scheduledFor?: number; createdAt: number };
 export type Call = { id: string; meetingId: string; number: number; startedAt: number; endedAt?: number };
-export type Peer = { id: string; meetingId: string; callId: string; principalId: string; name: string; kind: "person" | "agent"; joinedAt: number; lastSeenAt: number; leftAt?: number; leftReason?: LeftReason; mic: boolean; cam: boolean; screen: boolean; hand: boolean };
+export type Peer = { id: string; meetingId: string; callId: string; principalId: string; name: string; kind: "person" | "agent"; joinedAt: number; lastSeenAt: number; leftAt?: number; leftReason?: LeftReason; signalWindowAt?: number; signalCount?: number; mic: boolean; cam: boolean; screen: boolean; hand: boolean };
 
 const LETTERS = "abcdefghijkmnopqrstuvwxyz";
 export function newCode(): string {

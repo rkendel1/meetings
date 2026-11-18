@@ -83,6 +83,9 @@ export const peers = app.collection(
     // Why the connection ended: left (pressed Leave or closed the tab), replaced (a refresh or a new tab of the
     // same device took over), expired (stopped checking in), removed (by the host, or access was revoked), ended.
     leftReason: s.optional(s.enum(["left", "replaced", "expired", "removed", "ended"] as const)),
+    // Signaling budget: a fixed one-minute window per connection (feltkit/signals.ts).
+    signalWindowAt: s.optional(s.number()),
+    signalCount: s.optional(s.integer({ minimum: 0 })),
     mic: s.boolean(),
     cam: s.boolean(),
     screen: s.boolean(),
@@ -99,7 +102,7 @@ export const signals = app.collection(
     fromPeer: s.string(),
     toPeer: s.string(),
     kind: s.enum(["offer", "answer"] as const),
-    sdp: s.string({ maxLength: 200_000 }),
+    sdp: s.string({ maxLength: 65_536 }),
     createdAt: s.number(),
   },
   { indexes: [{ fields: ["toPeer"] }] },
