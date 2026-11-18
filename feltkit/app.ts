@@ -1,73 +1,123 @@
 /**
- * The application: its name, who may do what, and its data.
+ * Meetings: video calls in the browser, with chat, reactions, live captions and recaps,
+ * that people and agents attend together.
  *
- * Everything here is stored in one FeltDB instance per environment. In development
- * that is .feltkit/development/state — run `npx feltkit inspect` to see it.
+ * Every meeting, call, attendee, chat line, caption and note lives in this app's one FeltDB
+ * instance. Audio and video travel browser-to-browser (WebRTC); FeltDB carries only the
+ * signaling that connects them. Agents never touch media: they attend through AppPort/MCP
+ * and read the same timeline (chat + captions) people see.
  */
 import { feltkit, s } from "@feltdb/feltkit";
 
 export const app = feltkit({
   name: "meetings",
-  description: "A small task manager that demonstrates the whole FeltKit platform.",
-  // Roles grant AppPort permissions. "tasks.*" grants every tasks.<x> permission.
+  description: "Video meetings that people and agents attend together: chat, reactions, live captions, recaps.",
   roles: {
-    // Members use the app and Studio's agent (feltkit.agent.*: create, approve, and follow agent tasks).
-    // notifications.*: a principal reads, marks, and dismisses only its own notifications.
-    // webhooks.emit + webhooks.deliver: their changes notify registered endpoints (task.created,
-    // task.completed); each delivery runs as the person whose change emitted it.
-    member: ["projects.*", "tasks.*", "files.*", "notifications.*", "webhooks.emit", "webhooks.deliver", "feltkit.agent.*"],
-    // Viewers read. They can see agent tasks but not start or approve them.
-    viewer: ["projects.read", "tasks.read", "files.read", "notifications.read", "feltkit.agent.read"],
-    // Agents can read, complete tasks, and leave notes. They cannot create or delete.
-    // feltkit.agent.*: discover the app (feltkit_context), work tasks, propose actions; a person approves.
-    agent: ["projects.read", "tasks.read", "tasks.complete", "tasks.note", "files.read", "files.write", "notifications.send", "webhooks.emit", "webhooks.deliver", "feltkit.agent.*"],
-    // Admins configure the app in Studio → Services: the model (intelligence.*), stored
-    // credentials (credential.*), configuration, API keys, webhooks, jobs, and schedules.
-    // Credentials are stored by reference; the value never enters FeltDB.
-    // feltkit.operations.*: in production, admins are Studio's operators (npx feltkit operator grant).
-    admin: ["intelligence.*", "credential.*", "configuration.*", "apikeys.*", "webhooks.*", "jobs.*", "schedules.*", "feltkit.operations.*"],
+    // People: create meetings, join calls (media + signaling), chat, captions, notes.
+    member: ["meetings.*", "chat.*", "captions.*", "notes.*", "signal.*", "notifications.*", "feltkit.agent.*"],
+    // Agents: see meetings they may attend, attend (presence only, no media), read the timeline,
+    // chat, react, and leave notes for the recap. They cannot create meetings, host, or caption.
+    agent: ["meetings.read", "meetings.attend", "chat.*", "notes.*", "feltkit.agent.*"],
+    // Admins configure the app in Studio → Services: the model, credentials, configuration, API keys.
+    admin: ["intelligence.*", "credential.*", "configuration.*", "apikeys.*", "feltkit.operations.*"],
   },
-  // People sign up and sign in with an e-mail address and a password (stored in this app's FeltDB;
-  // only a hash of the password). A new account is a member.
+  // People sign up and sign in with an e-mail address and a password. A new account is a member.
   auth: { accounts: { roles: ["member"] } },
-  // Development-only identities. Sign in as them from the app or the dashboard.
   dev: {
     users: [
       { id: "ada", name: "Ada Lovelace", roles: ["member", "admin"] },
-      { id: "grace", name: "Grace Hopper", roles: ["viewer"] },
+      { id: "grace", name: "Grace Hopper", roles: ["member"] },
+      { id: "alan", name: "Alan Turing", roles: ["member"] },
     ],
   },
-  // AppPort Services, stored in this app's FeltDB instance, each configured in Studio →
-  // Services. Intelligence is the model the agent decides with (Studio → Models).
   services: {
-    files: true,
-    // The types this app sends; Studio offers them when you send one by hand.
-    notifications: { types: ["task.completed"] },
+    notifications: { types: ["meeting.invited"] },
     configuration: true,
-    // A request authenticated by an API key holds these roles.
-    apiKeys: { roles: ["member"] },
-    // The events this app emits (feltkit/tasks.ts); Studio offers them when you register an endpoint.
-    webhooks: { events: ["task.created", "task.completed"] },
-    // Job type → the mutation that runs it, as the principal that queued it, with retries.
-    jobs: { handlers: { "projects.clear-completed": "projects:clearCompleted" } },
-    schedules: true,
+    // An API key holds the agent role: that is how an agent outside this machine attends.
+    apiKeys: { roles: ["agent"] },
     intelligence: true,
   },
 });
 
-export const projects = app.collection("projects", {
-  name: s.string({ minLength: 1, maxLength: 80 }),
-  createdAt: s.number(),
-  createdBy: s.string(),
-});
+/** A meeting: a stable room with a short code. Calls happen in it, one at a time. */
+export const meetings = app.collection(
+  "meetings",
+  {
+    code: s.string({ minLength: 12, maxLength: 12 }), // abc-defg-hij
+    title: s.string({ minLength: 1, maxLength: 120 }),
+    hostId: s.string(),
+    hostName: s.string(),
+    // link: anyone signed in who has the code (people or agents). invited: the host and the listed principal ids.
+    access: s.enum(["link", "invited"] as const),
+    invited: s.array(s.string()),
+    scheduledFor: s.optional(s.number()),
+    createdAt: s.number(),
+  },
+  { unique: [["code"]], indexes: [{ fields: ["hostId"] }] },
+);
 
-export const tasks = app.collection("tasks", {
-  projectId: s.string(),
-  title: s.string({ minLength: 1, maxLength: 200 }),
-  details: s.optional(s.string({ maxLength: 4000 })),
-  done: s.boolean(),
-  createdAt: s.number(),
-  createdBy: s.string(),
-  completedAt: s.optional(s.number()),
-  completedBy: s.optional(s.string()),
-});
+/** One call in a meeting: starts when the first person joins, ends when the last person leaves. */
+export const calls = app.collection(
+  "calls",
+  {
+    meetingId: s.ref("meetings"),
+    number: s.integer({ minimum: 1 }),
+    startedAt: s.number(),
+    endedAt: s.optional(s.number()),
+  },
+  { unique: [["meetingId", "number"]], indexes: [{ fields: ["meetingId"] }] },
+);
+
+/** A connected device (a person's browser tab) or an attending agent, in one call. */
+export const peers = app.collection(
+  "peers",
+  {
+    meetingId: s.ref("meetings"),
+    callId: s.ref("calls"),
+    principalId: s.string(),
+    name: s.string({ minLength: 1, maxLength: 80 }),
+    kind: s.enum(["person", "agent"] as const),
+    joinedAt: s.number(),
+    lastSeenAt: s.number(),
+    leftAt: s.optional(s.number()),
+    mic: s.boolean(),
+    cam: s.boolean(),
+    screen: s.boolean(),
+    hand: s.boolean(),
+  },
+  { indexes: [{ fields: ["callId"] }, { fields: ["meetingId"] }] },
+);
+
+/** WebRTC signaling between two peers: one offer and one answer per pair, ICE included. Deleted once read. */
+export const signals = app.collection(
+  "signals",
+  {
+    meetingId: s.ref("meetings"),
+    fromPeer: s.string(),
+    toPeer: s.string(),
+    kind: s.enum(["offer", "answer"] as const),
+    sdp: s.string({ maxLength: 200_000 }),
+    createdAt: s.number(),
+  },
+  { indexes: [{ fields: ["toPeer"] }] },
+);
+
+/**
+ * The meeting's timeline, in one order: chat, captions (what people said), reactions, notes
+ * (agents' and people's notes for the recap) and joins/leaves. `seq` is per meeting.
+ */
+export const entries = app.collection(
+  "entries",
+  {
+    meetingId: s.ref("meetings"),
+    callId: s.optional(s.string()),
+    seq: s.integer({ minimum: 1 }),
+    kind: s.enum(["chat", "caption", "reaction", "note", "system"] as const),
+    authorId: s.string(),
+    authorName: s.string(),
+    authorKind: s.enum(["person", "agent"] as const),
+    text: s.string({ minLength: 1, maxLength: 4000 }),
+    createdAt: s.number(),
+  },
+  { indexes: [{ fields: ["meetingId", "seq"] }, { fields: ["callId"] }] },
+);

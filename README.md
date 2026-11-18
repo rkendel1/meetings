@@ -1,176 +1,115 @@
 # meetings
 
-A FeltKit application: a small task manager with projects, tasks and notes, roles, live
-queries, AppPort Services, an agent, and a development dashboard (Studio). Each
-environment keeps all of its state in one FeltDB instance.
+Video meetings in the browser that **people and agents attend together**, built with
+[FeltKit](https://www.npmjs.com/package/@feltdb/feltkit) (`npm create feltkit@latest meetings`).
+It is a FeltKit counterpart of [convex-meetings](https://github.com/saranatour1/convex-meetings)
+(Convex + TanStack Start + Cloudflare RealtimeKit), rebuilt around one idea: an agent is a
+first-class participant with its own identity and permissions, not a browser guest detected by name.
 
-## Quick start
+## What works
+
+- **Meetings** with a short code (`abc-defg-hij`) and a link: `/m/<code>`. Access is *anyone signed in
+  with the link* or *only the people and agents I invite*. Optional scheduled time.
+- **Calls**: lobby with camera/mic preview and device pickers; video, audio, mute, camera on/off,
+  **screen share** (stage layout), raise hand, six emoji reactions, several tabs/devices per person.
+  The first person to join starts the call; it ends when the last *person* leaves (agents never keep a
+  call open), or when the host ends it for everyone. The host can remove a connection.
+- **Chat** and **live captions** (each person's browser transcribes its own speech with the Web
+  Speech API, Chrome/Edge), kept in one ordered timeline per meeting.
+- **Recaps** per call: start/end, attendance per person and agent (with devices and minutes), notes,
+  reactions, and the full chat + transcript timeline. `/m/<code>/recap/<n>`.
+- **Agents attend over MCP** (served at `/mcp`): `meetings_list`, `meetings_get`, `meetings_join`
+  (presence, shown as an *AI agent* tile), `meetings_feed` (follow chat and captions with a cursor),
+  `chat_send`, `chat_react`, `notes_add` (summary/action items into the recap), `meetings_recap`,
+  `meetings_leave`. Agents carry no media; they read what was said as text.
+
+## Run it
 
 ```bash
 npm install
+```
+
+```bash
 npm run dev
 ```
 
-`npm run dev` prints:
+Open the App URL it prints. In development you are signed in as a dev user (Ada, Grace, Alan; switch in
+the header). The session is a cookie, so to be two people at once use two browser profiles or a private
+window. Production uses built-in e-mail/password accounts (`auth.accounts` in `feltkit/app.ts`).
 
+### Bring an agent into a call
+
+In the project folder, give the agent an identity (prints a token; the `agent` role is defined in
+`feltkit/app.ts`):
+
+```bash
+npx feltkit session create --type agent --id claude --role agent --name Claude
 ```
-  App        http://localhost:3000
-  Dashboard  http://localhost:3000/_feltkit/#token=…
-  AppPort    http://localhost:3000/appport
-  MCP        http://localhost:3000/mcp
-  State      …/.feltkit/development/state
+
+Connect it over MCP (Claude Code shown; any MCP client works):
+
+```bash
+claude mcp add --transport http meetings http://localhost:3000/mcp --header "Authorization: Bearer <token>"
 ```
 
-The port is 3000 unless something already uses it: another FeltKit app (or anything else) on 3000
-moves this one to the next free port, and the line above shows the one it got. To choose it:
-`npm run dev -- --port 3001`, or `FELTKIT_PORT=3001 npm run dev` (or `PORT`). A port you choose is
-used exactly or the server does not start; `--port 0` takes any free port.
+Then ask it: *"Join meeting abc-defg-hij with meetings_join, follow meetings_feed, answer in chat, and add
+a summary with notes_add when we wrap up. Call meetings_join every 20 seconds to stay present."* The
+call's **Agents** tab shows the same steps with the current code. For an invite-only meeting, the host
+invites the agent's id (`claude`). In production, issue an API key (Studio → Services → API keys);
+keys hold the `agent` role.
 
-- **App**: you are signed in as a development user. **Ada** (`member`, `admin`) can do
-  everything; **Grace** (`viewer`) can only read. Switch between them from the app's header.
-- **Dashboard** (Studio): your data, functions, capabilities, services, agent, models and
-  every operation that ran. Keep the link private: the token in it is this environment's
-  admin token.
-- Edit anything in `feltkit/`. The backend reloads in place and keeps its state, sessions and
-  history. The frontend in `src/` hot-reloads.
-
-Development state lives in `.feltkit/development/` (ignored by git). Delete that folder to
-start over.
-
-## What's in the project
+## How it is built
 
 | Path | What it is |
 |---|---|
-| `feltkit/app.ts` | The application: its name, roles and permissions, dev users, enabled services, collections |
-| `feltkit/projects.ts`, `feltkit/tasks.ts` | Functions: queries (read) and mutations (write). A function is `<module>:<export>`, e.g. `tasks:create` |
-| `feltkit/_*.ts` | Helpers shared by function modules (business rules, formatting). A file whose name starts with `_` is not loaded as a function module |
-| `feltkit/_generated/api.ts` | Typed references to every function. Regenerated by `feltkit dev` and `feltkit codegen`; don't edit it |
-| `src/` | The React frontend. Colors are tokens in `src/styles.css`, each `light-dark(light, dark)`; the top bar's switch (`src/theme.tsx`) picks light, dark, or the system setting, remembered per browser and applied before first paint by `public/theme.js` |
-| `tests/` | Tests, each against a fresh FeltDB instance |
-| `.feltkit/` | Local state, keys and builds, per environment. Never commit it |
+| `feltkit/app.ts` | Roles (`member`, `agent`, `admin`), dev users, services, and the collections: `meetings`, `calls`, `peers`, `signals`, `entries` |
+| `feltkit/_meeting.ts` | Meeting rules: access, liveness (45 s without a check-in = gone), settling a call, the per-meeting timeline sequence |
+| `feltkit/meetings.ts` | `list`, `create`, `update`, `get`, `feed`, `recap` |
+| `feltkit/calls.ts` | `join`, `heartbeat`, `leave`, `end` (host) |
+| `feltkit/chat.ts` | `send`, `react`, `caption`, `note` |
+| `feltkit/signals.ts` | WebRTC signaling: `send`, `inbox` (live), `ack` |
+| `src/rtc.ts` | The browser media mesh |
+| `src/Call.tsx`, `src/Recap.tsx`, `src/Home.tsx` | Screens |
+| `tests/meetings.test.ts` | Backend tests (people, agents, access, host controls, durability across restart) |
+| `scripts/e2e.mjs` | Browser test against a running dev server: two people with fake cameras + an agent over MCP |
 
-## How it works
+**State.** Everything durable is in the app's one FeltDB instance: meetings, calls, who attended and
+when, chat, captions, notes, reactions. Liveness is a `lastSeenAt` each connection refreshes every 15 s;
+a call is settled (stale connections marked left at their last check-in, the call ended at the last
+person's) by the next join, leave or check-in, so no background scheduler is needed and end times are
+accurate.
 
-**Data.** Collections are declared in `feltkit/app.ts` with a schema; every write is
-validated against it.
+**Media.** Audio and video go browser to browser over WebRTC, in a full mesh. FeltDB carries only the
+signaling: each pair exchanges one offer and one answer (ICE gathered up front), and the smaller peer id
+always offers, so there are no negotiation races. Each connection has one audio and one video
+transceiver from the start; camera off and screen share swap the outgoing track without renegotiating.
+STUN defaults to Google's public server; set `VITE_ICE_SERVERS` (JSON `RTCIceServer[]`) for your own
+STUN/TURN.
 
-```ts
-export const tasks = app.collection("tasks", {
-  projectId: s.string(),
-  title: s.string({ minLength: 1, maxLength: 200 }),
-  done: s.boolean(),
-});
-```
+**Authority.** Roles decide every call on every interface (app, AppPort, MCP). People (`member`) create
+meetings, join with media, caption, chat. Agents (`agent`) may read meetings they are allowed into,
+attend, chat, react and add notes; they cannot create or host meetings, caption, or send media
+signaling. Per-meeting access (link vs. invited) is checked in every function.
 
-**Functions.** A query reads, a mutation writes. Writes in one mutation commit together, or
-not at all. `access` is the permission the caller needs; `capability` publishes the
-function through AppPort, so agents can use it too.
-
-```ts
-export const create = app.mutation({
-  access: "tasks.write",
-  args: { projectId: s.string(), title: s.string({ minLength: 1 }) },
-  capability: { name: "tasks.create", description: "Add a task to a project." },
-  handler: async (ctx, { projectId, title }) =>
-    ctx.db.insert(tasks, { projectId, title, done: false, createdAt: Date.now(), createdBy: ctx.auth.requirePrincipal().id }),
-});
-```
-
-**Roles.** `roles` in `feltkit/app.ts` grant permissions; `"tasks.*"` grants every
-`tasks.<x>`. The server checks them on every call, whatever the frontend shows.
-
-**Frontend.** Queries are live: they update when the data changes.
-
-```tsx
-import { useMutation, useQueryState } from "@feltdb/feltkit/react";
-import { api } from "../feltkit/_generated/api";
-
-const tasks = useQueryState(api.tasks.list, { projectId });
-const create = useMutation(api.tasks.create);
-```
-
-## Services
-
-Every AppPort Service is enabled in `feltkit/app.ts` and stored in the same FeltDB instance:
-Files, Notifications, Configuration, API keys, Webhooks, Jobs, Schedules and Intelligence.
-Configure each one in **Studio → Services**: every service has its own screen, and each
-operation there is authorized as the dev user you choose with **Act as**. From a function:
-
-```ts
-// Effects that announce this mutation's change: performed only if it commits (mutations only).
-ctx.afterCommit.webhooks.emit("task.created", { id });
-ctx.afterCommit.notifications.send({ recipient: "grace", type: "task.completed", title: "Done" });
-ctx.afterCommit.jobs.enqueue("projects.clear-completed", {});
-// Reads and stored files, right away:
-await ctx.services.files.upload({ name: "notes.txt", content: text });
-const greeting = await ctx.services.configuration.get("GREETING");
-```
-
-Use `ctx.afterCommit` for anything that tells the world about the mutation's change. The same
-calls on `ctx.services` (`ctx.services.webhooks.emit`, `…notifications.send`, `…jobs.enqueue`)
-happen immediately and stay done even if the mutation then fails (a `CONFLICT` at commit), so
-receivers would hear about a change that never happened. `npx feltkit outbox list` shows every
-after-commit effect and its state.
-
-The starter already uses them: creating and completing a task emits `task.created` and
-`task.completed` to any registered webhook endpoint; completing someone else's task notifies
-its creator; and the job `projects.clear-completed` runs `projects:clearCompleted`.
-
-Declare what your app sends in `feltkit/app.ts`, so Studio's forms offer it in dropdowns:
-
-```ts
-services: {
-  notifications: { types: ["task.completed"] },
-  webhooks: { events: ["task.created", "task.completed"] },
-  jobs: { handlers: { "projects.clear-completed": "projects:clearCompleted" } },
-  // …
-}
-```
-
-A job type runs the mutation you name, as the user who queued it, with retries. To turn a
-service off, remove it from `services`.
-
-## Connecting an API
-
-**Studio → Integrations → Connect an API** reads an OpenAPI document (JSON) or lets you
-describe the operations yourself, then writes `feltkit/<name>.ts` and grants `<name>.*` to the
-roles you choose. Each operation becomes an AppPort capability (`<name>.<operation>`) with its
-permission, and every call is recorded. It is called through AppPort, not from a query or
-mutation: by the agent (MCP tools, proposals), by other apps and scripts (`POST /appport`), and by
-your frontend with an AppPort request carrying the session token. To act on the result inside
-your app, name a mutation in the operation's `onOutcome`: it runs as the caller with the call's
-record when the call finishes (success or failure). The API key is
-stored in FeltKit's custody; in production set `<NAME>_URL` and `FELTKIT_CREDENTIAL_<NAME>`.
-Then narrow each operation's `output` schema in that file to what the API returns.
-
-## Choosing a model for the agent
-
-Open **Studio → Models**, pick a provider and model, type its API key, then **Save and use**
-and **Test**. **Save for later** keeps more models (other providers too) under **Saved
-models**, each with its own key; **Use** switches the agent to one. Or from a terminal:
-
-```bash
-npx feltkit model set --provider anthropic --model <model> --api-key-stdin
-```
-
-The key is stored encrypted outside FeltDB (`.feltkit/development/credentials.vault`) and is
-never shown again. Never put a key in `feltkit/`, `src/`, tests or a committed file.
-
-## Testing
+## Tests
 
 ```bash
 npm test
 ```
 
-runs `tests/**/*.test.ts`. Each `createTestApp()` gets its own temporary FeltDB instance,
-and `t.as("ada")` calls functions as a dev user:
-
-```ts
-const t = await createTestApp();
-const projectId = await t.as("ada").mutation(api.projects.create, { name: "Launch" });
-await assert.rejects(t.as("grace").mutation(api.tasks.create, { projectId, title: "x" }), { code: "FORBIDDEN" });
-await t.close();
+```bash
+AGENT_TOKEN=<token from feltkit session create> node scripts/e2e.mjs http://localhost:3000
 ```
+
+The e2e script needs `npm run dev` running and Playwright with Chromium installed.
+
+## Not built (compared with convex-meetings)
+
+Organizations and custom roles, e-mail invites with `.ics`, Google/GitHub sign-in and passkeys,
+recording to object storage, a waiting room / join requests, ringing, public drop-in rooms with AI
+moderation, shared-screen annotations and whiteboard, usage caps. Media is a mesh, which suits small
+calls (each person uploads to every other); larger calls need an SFU (the change is confined to
+`src/rtc.ts` and `feltkit/signals.ts`). Peers behind strict NATs need a TURN server.
 
 ## Deploying
 
@@ -259,8 +198,8 @@ without their FeltDB settings.
    `feltkit/app.ts`, client secret as `FELTKIT_CREDENTIAL_<ID>_CLIENT_SECRET`).
 
    **On AppBoundry** (`npx feltkit build --target appboundry`, then
-   `npx @appport/appboundry@^1.3.0 run tasks.app`; to test the artifact itself, use
-   `createArtifactTestApp("tasks.app")` from `@feltdb/feltkit/testing`), AppBoundry's operators
+   `npx @appport/appboundry@^1.3.0 run meetings.app`; to test the artifact itself, use
+   `createArtifactTestApp("meetings.app")` from `@feltdb/feltkit/testing`), AppBoundry's operators
    create users with your app's roles and issue their sessions:
 
    ```bash
@@ -311,7 +250,7 @@ To deploy on Managed FeltDB, where no host keeps state, start from
 
 ## Portability (AppBoundry)
 
-`npx feltkit build --target appboundry` compiles the app into `tasks.app`, which runs without
+`npx feltkit build --target appboundry` compiles the app into `meetings.app`, which runs without
 this project or FeltKit. A plain `npx feltkit build` warns about anything that would block it.
 An artifact refuses (the build names the file and line):
 
@@ -322,7 +261,7 @@ An artifact refuses (the build names the file and line):
   people in the frontend.
 
 It also leaves out Studio, `/mcp`, API keys, schedules and webhook delivery. To run your tests
-against the artifact itself: `createArtifactTestApp("tasks.app")` from `@feltdb/feltkit/testing`.
+against the artifact itself: `createArtifactTestApp("meetings.app")` from `@feltdb/feltkit/testing`.
 
 ## Commands
 

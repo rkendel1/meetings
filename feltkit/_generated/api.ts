@@ -2,9 +2,10 @@
 /* eslint-disable */
 import { createApi } from "@feltdb/feltkit/client";
 import type * as app_module from "../app.js";
-import type * as inbox_module from "../inbox.js";
-import type * as projects_module from "../projects.js";
-import type * as tasks_module from "../tasks.js";
+import type * as calls_module from "../calls.js";
+import type * as chat_module from "../chat.js";
+import type * as meetings_module from "../meetings.js";
+import type * as signals_module from "../signals.js";
 
 /** Typed references to every query and mutation. Type-only imports: no backend code reaches the browser. */
-export const api = createApi<{ "app": typeof app_module; "inbox": typeof inbox_module; "projects": typeof projects_module; "tasks": typeof tasks_module }>();
+export const api = createApi<{ "app": typeof app_module; "calls": typeof calls_module; "chat": typeof chat_module; "meetings": typeof meetings_module; "signals": typeof signals_module }>();
