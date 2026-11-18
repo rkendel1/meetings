@@ -8,9 +8,11 @@
 //             either direction can flow once the other side has closed it).
 // "adversarial" runs the same case with a participant whose browser ignores close() and track.stop(),
 // so only what the server and the other clients enforce remains.
-// Bounds: revocation and removal are pushed through live queries (seconds); a session that ends elsewhere
-// is detected by the participant's next heartbeat or session re-check (≤ 15 s), and by everyone else when
-// that participant's presence expires (≤ 45 s after its last check-in, + up to 15 s until a check-in settles it).
+// Bounds (asserted): revocation and removal end the connection at once, through live queries (≤ 10 s
+// allowed, ~0.25 s measured). A session that ends elsewhere is ended by FeltKit's auth.onSessionEnd
+// (calls:sessionEnded), so everyone else closes their side within 5 s, even when the participant's own
+// client ignores it; that client itself stops on its next request or stream re-check (≤ 20 s allowed).
+// On a FeltKit without auth.onSessionEnd, the session cases fail: others learn only when presence expires.
 import { createRequire } from "node:module";
 import assert from "node:assert/strict";
 const { chromium } = createRequire(import.meta.url)("playwright");
@@ -136,9 +138,35 @@ try {
   await measure("access revoked by the host", { evil: true, act: revokeAccess, othersBoundMs: 10_000 });
   await measure("removed by the host", { act: removeByHost, selfBoundMs: 10_000, othersBoundMs: 10_000 });
   await measure("removed by the host", { evil: true, act: removeByHost, othersBoundMs: 10_000 });
-  await measure("signed out in another tab of the same browser", { act: signOutInAnotherTab, selfBoundMs: 20_000, othersBoundMs: 75_000 });
-  await measure("session revoked from another device", { act: sessionRevokedElsewhere, selfBoundMs: 20_000, othersBoundMs: 75_000 });
-  await measure("session revoked from another device", { evil: true, act: sessionRevokedElsewhere, othersBoundMs: 75_000 });
+  await measure("signed out in another tab of the same browser", { act: signOutInAnotherTab, selfBoundMs: 20_000, othersBoundMs: 5_000 });
+  await measure("signed out in another tab of the same browser", { evil: true, act: signOutInAnotherTab, othersBoundMs: 5_000 });
+  await measure("session revoked from another device", { act: sessionRevokedElsewhere, selfBoundMs: 20_000, othersBoundMs: 5_000 });
+  await measure("session revoked from another device", { evil: true, act: sessionRevokedElsewhere, othersBoundMs: 5_000 });
+  // Forged heartbeats: no credentials, an invented token, and a real session aimed at someone else's connection.
+  {
+    const { ada, grace } = await call();
+    const gracePeer = await ada.evaluate(async () => {
+      const h = { "Content-Type": "application/json", "X-FeltKit-Session": "cookie" };
+      const s = await (await fetch("/api/session", { headers: h })).json();
+      const code = location.pathname.split("/m/")[1];
+      const r = await fetch("/api/query/meetings:get", { method: "POST", headers: { ...h, "X-FeltKit-CSRF": s.csrf }, body: JSON.stringify({ args: { code } }) });
+      return (await r.json()).value.peers.find((p) => p.principalId === "grace").id;
+    });
+    const forged = async (headers) => (await fetch(`${URL_}/api/mutation/calls:heartbeat`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ args: { peerId: gracePeer } }) })).status;
+    const none = await forged({});
+    const invented = await forged({ authorization: "Bearer fks_" + "A".repeat(43) });
+    const someoneElse = await ada.evaluate(async (peerId) => {
+      const h = { "Content-Type": "application/json", "X-FeltKit-Session": "cookie" };
+      const s = await (await fetch("/api/session", { headers: h })).json();
+      const r = await fetch("/api/mutation/calls:heartbeat", { method: "POST", headers: { ...h, "X-FeltKit-CSRF": s.csrf }, body: JSON.stringify({ args: { peerId } }) });
+      return { status: r.status, code: (await r.json()).error?.code };
+    }, gracePeer);
+    const ok = none === 401 && invented === 401 && someoneElse.status >= 400 && someoneElse.code === "NOT_FOUND";
+    results.push({ name: "forged heartbeats", ok });
+    console.log(`${ok ? "✓" : "✗"} forged heartbeats are refused: no credentials ${none}, invented token ${invented}, another person's session ${someoneElse.status} ${someoneElse.code}`);
+    await ada.context().close();
+    await grace.context().close();
+  }
 } finally {
   await browser.close();
 }

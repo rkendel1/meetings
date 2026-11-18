@@ -1,5 +1,6 @@
 // Session expiry and cleanup, against `npm run dev`: an agent attends a live call with a session that
-// expires after 36 s (feltkit session create --ttl 0.01) and keeps checking in every 10 s.
+// expires after 36 s (feltkit session create --ttl 0.01) and keeps checking in every 10 s. Needs FeltKit
+// with auth.onSessionEnd (expired sessions ended within 5 s); without it, the 8 s bound fails.
 // Measures: when its calls are refused, when the person in the call stops seeing it, and what the durable
 // record says (attendance: it left at its last successful check-in, not when someone noticed).
 //   node scripts/e2e-session-expiry.mjs [url]
@@ -60,10 +61,13 @@ try {
     refusal,
     lastSuccessfulCheckInBeforeExpiryMs: expiresAt - lastOk,
     tileGoneAfterLastCheckInMs: goneWithin - lastOk,
+    tileGoneAfterExpiryMs: goneWithin - expiresAt,
     recapRow: row.replace(/\s+/g, " "),
   }, null, 1));
   assert.ok(refusedAt >= expiresAt - 1000, "not refused before it expired");
-  assert.ok(goneWithin - lastOk <= 45_000 + 20_000, "presence expired within LIVE_MS plus one check-in interval");
+  // FeltKit ends an expired session within its sweep (5 s) and runs auth.onSessionEnd: the agent is gone for
+  // everyone within that, not when its presence would have expired (45 s after its last check-in).
+  assert.ok(goneWithin - expiresAt <= 8_000, `gone ${goneWithin - expiresAt} ms after the session expired (bound 8 s)`);
   console.log("✓ session expiry: refused after expiry, presence expired, attendance recorded");
 } finally {
   await browser.close();

@@ -1,7 +1,8 @@
 import { fail, s } from "@feltdb/feltkit";
 import { app, calls } from "./app.js";
 import { peers } from "./_presence.js";
-import { append, endPeer, isLive, kindOf, latestCall, meetingFor, nameOf, ownPeer, settle, type Peer } from "./_meeting.js";
+import { append, endPeer, isLive, kindOf, latestCall, meetingFor, nameOf, ownPeer, sessionRefOf, settle, type Meeting, type Peer } from "./_meeting.js";
+import { meetings } from "./app.js";
 
 const Joined = s.object({ peerId: s.string(), callId: s.string(), callNumber: s.integer(), started: s.boolean() });
 
@@ -45,14 +46,16 @@ export const join = app.mutation({
     // never a name the request chooses, so nobody can speak as someone else.
     const display = nameOf(me);
     if (kind === "agent") {
-      const [mine] = ((await ctx.db.find(peers, { callId: call.id, principalId: me.id })) as Peer[]).filter((p) => isLive(p, now));
+      const [mine] = ((await ctx.db.find(peers, { callId: call.id, principalId: me.id })) as Peer[]).filter((p) => isLive(p, now) && (!p.sessionRef || p.sessionRef === sessionRefOf(ctx)));
       if (mine) {
         await ctx.db.patch(peers, mine.id, { lastSeenAt: now });
         return { peerId: mine.id, callId: call.id, callNumber: call.number, started: false };
       }
     }
+    const sessionRef = sessionRefOf(ctx);
     const peerId = await ctx.db.insert(peers, {
       meetingId: meeting.id, callId: call.id, principalId: me.id, name: display, kind,
+      ...(sessionRef ? { sessionRef } : {}),
       joinedAt: now, lastSeenAt: now, mic: kind === "person" && Boolean(mic), cam: kind === "person" && Boolean(cam), screen: false, hand: false,
     });
     if (!replaces) await append(ctx, meeting, { callId: call.id, kind: "system", text: `${display} joined${kind === "agent" ? " (AI agent)" : ""}`, author: { id: me.id, name: display, kind } });
@@ -125,5 +128,36 @@ export const end = app.mutation({
       await append(ctx, meeting, { callId: call.id, kind: "system", text: "The host ended the call" });
     }
     return { ok: true };
+  },
+});
+
+/**
+ * FeltKit calls this when one of the caller's sessions ends (feltkit({ auth: { onSessionEnd } }): signed out,
+ * revoked, rotated or expired). Every connection that session created ends now, so everyone else's live
+ * view drops it and closes their media to it. Safe to call directly: it ends only the caller's own
+ * connections bound to the named session.
+ */
+export const sessionEnded = app.mutation({
+  access: "meetings.attend",
+  args: { session: s.string({ minLength: 1, maxLength: 64 }), reason: s.optional(s.string({ maxLength: 32 })) },
+  returns: s.object({ ended: s.integer() }),
+  retry: { sequenceConflicts: 5 },
+  handler: async (ctx, { session }) => {
+    const me = ctx.auth.requirePrincipal();
+    const now = Date.now();
+    const mine = ((await ctx.db.find(peers, { principalId: me.id })) as Peer[]).filter((p) => p.leftAt === undefined && p.sessionRef === session);
+    const touched = new Map<string, Meeting>();
+    for (const p of mine) {
+      await endPeer(ctx, p, now, "session-ended");
+      const meeting = (await ctx.db.get(meetings, p.meetingId)) as Meeting | null;
+      if (meeting) {
+        touched.set(meeting.id, meeting);
+        await append(ctx, meeting, { callId: p.callId, kind: "system", text: `${p.name} left (session ended)`, author: { id: me.id, name: p.name, kind: p.kind } });
+      }
+    }
+    // An ended session cannot come back to these connections, so no grace period: like pressing Leave.
+    const final = mine.some((p) => p.kind === "person");
+    for (const meeting of touched.values()) await settle(ctx, meeting, now + 1, { final });
+    return { ended: mine.length };
   },
 });

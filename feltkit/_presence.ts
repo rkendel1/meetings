@@ -24,7 +24,10 @@ export const peers = app.collection(
     leftAt: s.optional(s.number()),
     // Why the connection ended: left (pressed Leave or closed the tab), replaced (a refresh or a new tab of the
     // same device took over), expired (stopped checking in), removed (by the host, or access was revoked), ended.
-    leftReason: s.optional(s.enum(["left", "replaced", "expired", "removed", "ended"] as const)),
+    leftReason: s.optional(s.enum(["left", "replaced", "expired", "removed", "ended", "session-ended"] as const)),
+    // The session that created this connection (FeltKit ctx.auth.session.ref, where the platform provides it).
+    // Only that session may keep it alive, and it ends when that session ends (calls:sessionEnded).
+    sessionRef: s.optional(s.string({ maxLength: 64 })),
     // Signaling budget: a fixed one-minute window per connection (feltkit/signals.ts).
     signalWindowAt: s.optional(s.number()),
     signalCount: s.optional(s.integer({ minimum: 0 })),
@@ -33,7 +36,7 @@ export const peers = app.collection(
     screen: s.boolean(),
     hand: s.boolean(),
   },
-  { indexes: [{ fields: ["callId"] }, { fields: ["meetingId"] }] },
+  { indexes: [{ fields: ["callId"] }, { fields: ["meetingId"] }, { fields: ["principalId"] }] },
 );
 
 /** A connection that has not checked in for this long is gone (closed tab, lost network, crashed agent). */

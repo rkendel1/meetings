@@ -22,7 +22,13 @@ export const app = feltkit({
     admin: ["intelligence.*", "credential.*", "configuration.*", "apikeys.*", "feltkit.operations.*"],
   },
   // People sign up and sign in with an e-mail address and a password. A new account is a member.
-  auth: { accounts: { roles: ["member"] } },
+  auth: {
+    accounts: { roles: ["member"] },
+    // When a session ends (sign-out, revocation, expiry), FeltKit runs this as that session's principal, so
+    // the connections it held end at once (session-bound presence). Platforms without the hook ignore it, and
+    // presence then ends by expiry instead.
+    onSessionEnd: "calls:sessionEnded",
+  } as any,
   dev: {
     users: [
       { id: "ada", name: "Ada Lovelace", roles: ["member", "admin"] },
