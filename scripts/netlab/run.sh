@@ -3,6 +3,7 @@
 # iproute2, iptables, coturn, Playwright's Chromium, and the app's dev server started with the TURN
 # provider's credential:   FELTKIT_CREDENTIAL_TURN=netlab-token npm run dev
 # It runs the TURN provider stand-in (scripts/turn-api-dev.mjs) itself. RUNS=n repeats each scenario.
+#   run.sh          every scenario          run.sh 4 5      only scenarios 4 and 5
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 RUNS="${RUNS:-1}"
@@ -21,7 +22,9 @@ provider() { # the ICE URLs the provider hands out; waits until it answers with 
 }
 fails=0
 open=0
+ONLY=" $* "
 scenario() { # name nat block urls expect(direct|relay|relay-tcp|none) [open: a known, unresolved limitation]
+  if [ "$ONLY" != "  " ] && [[ "$ONLY" != *" ${1%% *} "* ]]; then return; fi
   provider "$4"
   for i in $(seq 1 "$RUNS"); do
     "$HERE/lab.sh" up "$2" "$3" > /dev/null

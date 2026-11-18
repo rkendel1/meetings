@@ -1,0 +1,11 @@
+1 full-cone NATs (EIM/EIF), STUN only [1/2]: PASS expected=direct got=direct relayIssued=true in 593 ms, ada srflx/udp→srflx, grace srflx/udp→srflx, video 320/320
+1 full-cone NATs (EIM/EIF), STUN only [2/2]: PASS expected=direct got=direct relayIssued=true in 587 ms, ada srflx/udp→srflx, grace srflx/udp→srflx, video 320/320
+2 Linux MASQUERADE NATs, STUN only [1/2]: PASS expected=none got=none relayIssued=true {"ada":"connecting","grace":"connecting"}
+2 Linux MASQUERADE NATs, STUN only [2/2]: PASS expected=none got=none relayIssued=true {"ada":"connecting","grace":"connecting"}
+3 symmetric NATs, STUN only [1/2]: PASS expected=none got=none relayIssued=true {"ada":"connecting","grace":"connecting"}
+3 symmetric NATs, STUN only [2/2]: PASS expected=none got=none relayIssued=true {"ada":"connecting","grace":"connecting"}
+4 symmetric NATs, TURN [1/2]: PASS expected=relay got=relay relayIssued=true in 540 ms, ada relay/udp(relay over udp)→prflx, grace prflx/udp→relay, video 640/320
+4 symmetric NATs, TURN [2/2]: PASS expected=relay got=relay relayIssued=true in 549 ms, ada relay/udp(relay over udp)→prflx, grace prflx/udp→relay, video 640/320
+5 symmetric NATs, site B blocks all UDP, TURN [1/2]: OPEN expected=relay-tcp got=none relayIssued=true {"ada":"connecting","grace":"connecting"}
+5 symmetric NATs, site B blocks all UDP, TURN [2/2]: OPEN expected=relay-tcp got=none relayIssued=true {"ada":"connecting","grace":"connecting"}
+failures: 0, open: 2
