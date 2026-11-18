@@ -21,7 +21,8 @@ const OFFER_TIMEOUT_MS = 15_000;
 
 type Conn = { pc: RTCPeerConnection; stream: MediaStream; listed: boolean; createdAt: number };
 
-function iceServers(): RTCIceServer[] {
+/** The default when the server issues none (no TURN provider): STUN only, or VITE_ICE_SERVERS. */
+function defaultIceServers(): RTCIceServer[] {
   const configured = (import.meta as any).env?.VITE_ICE_SERVERS as string | undefined;
   if (configured) {
     try {
@@ -59,7 +60,25 @@ export class Mesh {
     readonly self: string,
     private send: Send,
     private onChange: () => void,
+    /** From the server (`media:iceServers`): STUN plus short-lived TURN credentials when a provider is configured. */
+    private ice: RTCIceServer[] = defaultIceServers(),
   ) {}
+
+  /** What each pair connected over, from the selected candidate pair: host, srflx, prflx or relay. */
+  async paths(): Promise<Record<string, string>> {
+    const out: Record<string, string> = {};
+    for (const [peerId, c] of this.conns) {
+      const stats = await c.pc.getStats();
+      stats.forEach((r: any) => {
+        if (r.type === "candidate-pair" && r.nominated && r.state === "succeeded") {
+          const local = stats.get(r.localCandidateId) as any;
+          const remote = stats.get(r.remoteCandidateId) as any;
+          out[peerId] = `${local?.candidateType}/${local?.protocol}${local?.relayProtocol ? `(relay over ${local.relayProtocol})` : ""}→${remote?.candidateType}`;
+        }
+      });
+    }
+    return out;
+  }
 
   remotes(): Remote[] {
     return [...this.conns.entries()].map(([peerId, c]) => ({ peerId, stream: c.stream, state: c.pc.connectionState }));
@@ -114,7 +133,7 @@ export class Mesh {
 
   private create(peerId: string, listed: boolean): Conn {
     this.drop(peerId);
-    const pc = new RTCPeerConnection({ iceServers: iceServers() });
+    const pc = new RTCPeerConnection({ iceServers: this.ice });
     const stream = new MediaStream();
     const conn: Conn = { pc, stream, listed, createdAt: Date.now() };
     pc.ontrack = (e) => {

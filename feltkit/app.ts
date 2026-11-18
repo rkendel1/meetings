@@ -14,7 +14,7 @@ export const app = feltkit({
   description: "Video meetings that people and agents attend together: chat, reactions, live captions, recaps.",
   roles: {
     // People: create meetings, join calls (media + signaling), chat, captions, notes.
-    member: ["meetings.*", "chat.*", "captions.*", "notes.*", "signal.*", "notifications.*", "feltkit.agent.*"],
+    member: ["meetings.*", "chat.*", "captions.*", "notes.*", "signal.*", "media.*", "notifications.*", "feltkit.agent.*"],
     // Agents: see meetings they may attend, attend (presence only, no media), read the timeline,
     // chat, react, and leave notes for the recap. They cannot create meetings, host, or caption.
     agent: ["meetings.read", "meetings.attend", "chat.*", "notes.*", "feltkit.agent.*"],
@@ -127,3 +127,31 @@ export const entries = app.collection(
   },
   { indexes: [{ fields: ["meetingId", "seq"] }, { fields: ["callId"] }] },
 );
+
+/**
+ * TURN relay credentials, from a TURN provider's API (the shape of Cloudflare Realtime's
+ * `POST /v1/turn/keys/{key}/credentials/generate-ice-servers`). The provider's API token stays in
+ * FeltKit's credential custody (`credential-ref:turn`; in production `FELTKIT_CREDENTIAL_TURN`); the
+ * browser only ever sees short-lived relay credentials, issued to people in a live call
+ * (feltkit/media.ts). `TURN_API_URL` is the key's URL, e.g. https://rtc.live.cloudflare.com/v1/turn/keys/<id>.
+ * Development: `node scripts/turn-api-dev.mjs` in front of a local coturn.
+ */
+const IceServer = s.object({ urls: s.union([s.string(), s.array(s.string())]), username: s.optional(s.string()), credential: s.optional(s.string()) });
+export const turn = app.integration("turn", {
+  description: "Short-lived TURN relay credentials for calls.",
+  baseUrl: { env: "TURN_API_URL", development: "http://127.0.0.1:4790/v1/turn/keys/dev" },
+  credential: "credential-ref:turn",
+  timeoutMs: 5000,
+  operations: {
+    iceservers: {
+      method: "POST",
+      path: "/credentials/generate-ice-servers",
+      input: { ttl: s.integer({ minimum: 60, maximum: 86_400 }) },
+      output: s.object({ iceServers: s.union([IceServer, s.array(IceServer)]) }),
+      effect: "observation",
+      readOnly: true,
+      access: "media.ice",
+      expose: false, // only through media:iceServers, which checks the caller is in a live call
+    },
+  },
+});

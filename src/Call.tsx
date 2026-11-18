@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useMutation, useQueryState } from "@feltdb/feltkit/react";
+import { useFeltKit, useMutation, useQueryState } from "@feltdb/feltkit/react";
 import { api } from "../feltkit/_generated/api";
 import { Mesh } from "./rtc";
 import { clock, describe, navigate, retrying } from "./util";
@@ -240,16 +240,29 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
   const mesh = useRef<Mesh | null>(null);
   const done = useRef(false);
 
-  // Media mesh for this connection.
+  // Media mesh for this connection, with ICE servers issued for it (TURN credentials when configured).
+  const client = useFeltKit();
+  const [meshReady, setMeshReady] = useState(0);
   useEffect(() => {
-    // Concurrent writes are retried; RATE_LIMITED is not (the mesh offers again after its timeout).
-    const m = new Mesh(joined.peerId, (toPeer, kind, sdp) => retrying(() => sendSignal({ fromPeer: joined.peerId, toPeer, kind, sdp })), () => setTick((t) => t + 1));
-    // A lost camera or microphone (unplugged, revoked) turns that control off instead of sending a dead track.
-    for (const track of local.current.getTracks()) track.addEventListener("ended", () => lost(track));
-    mesh.current = m;
-    m.setTracks({ audio: local.current.getAudioTracks()[0] ?? null, video: local.current.getVideoTracks()[0] ?? null });
-    local.current.getAudioTracks().forEach((t) => (t.enabled = mic));
-    return () => m.close();
+    let cancelled = false;
+    let m: Mesh | null = null;
+    void (async () => {
+      const ice = await client.action(api.media.iceServers, { peerId: joined.peerId }).catch(() => null);
+      if (cancelled) return;
+      // Concurrent writes are retried; RATE_LIMITED is not (the mesh offers again after its timeout).
+      m = new Mesh(joined.peerId, (toPeer, kind, sdp) => retrying(() => sendSignal({ fromPeer: joined.peerId, toPeer, kind, sdp })), () => setTick((t) => t + 1), ice?.iceServers as RTCIceServer[] | undefined);
+      mesh.current = m;
+      (window as any).__meetings = { mesh: m, relay: Boolean(ice?.relay) }; // for diagnostics and the network tests
+      // A lost camera or microphone (unplugged, revoked) turns that control off instead of sending a dead track.
+      for (const track of local.current.getTracks()) track.addEventListener("ended", () => lost(track));
+      m.setTracks({ audio: local.current.getAudioTracks()[0] ?? null, video: local.current.getVideoTracks()[0] ?? null });
+      local.current.getAudioTracks().forEach((t) => (t.enabled = mic));
+      setMeshReady((n) => n + 1);
+    })();
+    return () => {
+      cancelled = true;
+      m?.close();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joined.peerId]);
 
@@ -258,13 +271,13 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
   const personIds = people.filter((p) => p.principalId !== props.me.id || p.id === joined.peerId).map((p) => p.id).join(",");
   useEffect(() => {
     mesh.current?.sync(personIds ? personIds.split(",") : []);
-  }, [personIds]);
+  }, [personIds, meshReady]);
 
   useEffect(() => {
     const m = mesh.current;
     if (!m || !inbox.data?.length) return;
     void m.receive(inbox.data as any).then((ids) => void (ids.length && ack({ peerId: joined.peerId, ids }).catch(() => {})));
-  }, [inbox.data, ack, joined.peerId]);
+  }, [inbox.data, ack, joined.peerId, meshReady]);
 
   // Presence: check in every 15 s and whenever what we share changes.
   const [offline, setOffline] = useState(false);
