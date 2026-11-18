@@ -1,6 +1,7 @@
 /** Published shapes, derived from the collections (never restated). */
 import { s } from "@feltdb/feltkit";
-import { calls, entries, meetings, peers } from "./app.js";
+import { calls, entries, meetings } from "./app.js";
+import { peers } from "./_presence.js";
 
 export const MeetingOut = s.doc(meetings).omit("__version");
 export const CallOut = s.doc(calls).omit("__version");

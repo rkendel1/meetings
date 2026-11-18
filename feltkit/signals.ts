@@ -9,8 +9,23 @@
  * - an SDP of at most 64 kB that looks like one.
  */
 import { fail, s } from "@feltdb/feltkit";
-import { app, peers, signals } from "./app.js";
+import { app } from "./app.js";
+import { peers } from "./_presence.js";
 import { ownPeer, type Peer } from "./_meeting.js";
+
+/** WebRTC signaling between two peers: one offer and one answer per pair, ICE included. Deleted once read. */
+export const signals = app.collection(
+  "signals",
+  {
+    meetingId: s.ref("meetings"),
+    fromPeer: s.string(),
+    toPeer: s.string(),
+    kind: s.enum(["offer", "answer"] as const),
+    sdp: s.string({ maxLength: 65_536 }),
+    createdAt: s.number(),
+  },
+  { indexes: [{ fields: ["toPeer"] }] },
+);
 
 export const SIGNALS_PER_MINUTE = 60;
 const WINDOW_MS = 60_000;

@@ -1,8 +1,47 @@
 {
   "classify": [
-    { "path": "feltkit/_presence.ts", "class": "infrastructure", "reason": "presence leases and lazy call settlement: FeltDB has no TTL/leases and live queries do not re-run on time" },
-    { "path": "feltkit/signals.ts", "class": "infrastructure", "reason": "WebRTC signaling relayed through durable records: AppPort events are not usable yet (FeltKit UPSTREAM-GAPS A8)" },
-    { "path": "src/rtc.ts", "class": "infrastructure", "reason": "browser media transport (WebRTC mesh); the boundary an SFU would replace" },
-    { "path": "scripts/e2e.mjs", "class": "tests", "reason": "browser end-to-end and failure-condition acceptance script" }
-  ]
+    {
+      "path": "feltkit/_presence.ts",
+      "class": "infrastructure",
+      "reason": "presence leases (the peers collection) and lazy call settlement: FeltDB has no TTL/leases and live queries do not re-run on time"
+    },
+    {
+      "path": "feltkit/signals.ts",
+      "class": "infrastructure",
+      "reason": "WebRTC signaling relayed through durable records (the signals collection), with rate limits: AppPort events are not usable yet (FeltKit UPSTREAM-GAPS A8)"
+    },
+    {
+      "path": "feltkit/media.ts",
+      "class": "infrastructure",
+      "reason": "ICE server issuing for the media transport (TURN credentials through the turn integration)"
+    },
+    {
+      "path": "src/rtc.ts",
+      "class": "infrastructure",
+      "reason": "browser media transport (WebRTC mesh); the boundary an SFU would replace"
+    },
+    {
+      "path": "scripts/e2e.mjs",
+      "class": "tests",
+      "reason": "browser end-to-end and failure-condition acceptance script"
+    },
+    {
+      "path": "scripts/e2e-*.mjs",
+      "class": "tests",
+      "reason": "acceptance scripts: media termination, session expiry"
+    },
+    {
+      "path": "scripts/capacity.mjs",
+      "class": "tests",
+      "reason": "capacity measurement harness"
+    },
+    {
+      "path": "scripts/netlab",
+      "class": "tests",
+      "reason": "cross-network test lab (namespaces, NAT, coturn) and its scenario runner"
+    }
+  ],
+  "acknowledged": {
+    "http-server:scripts/turn-api-dev.mjs": "a development stand-in for an external TURN provider's API, not part of the application"
+  }
 }

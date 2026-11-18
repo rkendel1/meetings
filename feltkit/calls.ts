@@ -1,5 +1,6 @@
 import { fail, s } from "@feltdb/feltkit";
-import { app, calls, peers } from "./app.js";
+import { app, calls } from "./app.js";
+import { peers } from "./_presence.js";
 import { append, endPeer, isLive, kindOf, latestCall, meetingFor, nameOf, ownPeer, settle, type Peer } from "./_meeting.js";
 
 const Joined = s.object({ peerId: s.string(), callId: s.string(), callNumber: s.integer(), started: s.boolean() });

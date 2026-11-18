@@ -1,6 +1,7 @@
 /** Meeting rules shared by the function modules. Not loaded as functions (leading underscore). */
 import { fail } from "@feltdb/feltkit";
-import { calls, entries, meetings, peers } from "./app.js";
+import { calls, entries, meetings } from "./app.js";
+import { peers } from "./_presence.js";
 import { GRACE_MS, LIVE_MS, callState, endPeer, isLive, settle, type CallState } from "./_presence.js";
 export { GRACE_MS, LIVE_MS, callState, endPeer, isLive, settle, type CallState };
 

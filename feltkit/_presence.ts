@@ -4,9 +4,37 @@
  * next write that touches a call (join, leave, check-in) settles it. Kept apart from the meeting rules
  * so it can be replaced if the platform provides presence (see AUDIT.md, platform gaps).
  */
-import { calls, peers, signals } from "./app.js";
+import { s } from "@feltdb/feltkit";
+import { app, calls } from "./app.js";
+import { signals } from "./signals.js";
 import type { Call, LeftReason, Meeting, Peer } from "./_meeting.js";
 import { latestCall } from "./_meeting.js";
+
+/** A connected device (a person's browser tab) or an attending agent, in one call. */
+export const peers = app.collection(
+  "peers",
+  {
+    meetingId: s.ref("meetings"),
+    callId: s.ref("calls"),
+    principalId: s.string(),
+    name: s.string({ minLength: 1, maxLength: 80 }),
+    kind: s.enum(["person", "agent"] as const),
+    joinedAt: s.number(),
+    lastSeenAt: s.number(),
+    leftAt: s.optional(s.number()),
+    // Why the connection ended: left (pressed Leave or closed the tab), replaced (a refresh or a new tab of the
+    // same device took over), expired (stopped checking in), removed (by the host, or access was revoked), ended.
+    leftReason: s.optional(s.enum(["left", "replaced", "expired", "removed", "ended"] as const)),
+    // Signaling budget: a fixed one-minute window per connection (feltkit/signals.ts).
+    signalWindowAt: s.optional(s.number()),
+    signalCount: s.optional(s.integer({ minimum: 0 })),
+    mic: s.boolean(),
+    cam: s.boolean(),
+    screen: s.boolean(),
+    hand: s.boolean(),
+  },
+  { indexes: [{ fields: ["callId"] }, { fields: ["meetingId"] }] },
+);
 
 /** A connection that has not checked in for this long is gone (closed tab, lost network, crashed agent). */
 export const LIVE_MS = 45_000;
