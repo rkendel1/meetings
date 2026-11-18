@@ -15,7 +15,8 @@
     "e2e:termination": "node scripts/e2e-termination.mjs",
     "netlab": "sudo scripts/netlab/run.sh",
     "e2e:expiry": "node scripts/e2e-session-expiry.mjs",
-    "capacity": "node scripts/capacity.mjs"
+    "capacity": "node scripts/capacity.mjs",
+    "e2e:identity": "node scripts/e2e-identity.mjs"
   },
   "dependencies": {
     "@feltdb/feltkit": "^0.3.32",

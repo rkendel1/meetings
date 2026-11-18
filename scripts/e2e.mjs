@@ -154,13 +154,13 @@ try {
     assert.equal(reused.body.error?.details?.reason ?? reused.body.error?.code, "IDEMPOTENCY_KEY_REUSED");
   });
 
-  // KNOWN PLATFORM GAP (FeltKit 0.3.32, dist/server/mcp.js): tools/call ignores params._meta, so the
-  // idempotency key never reaches AppPort over MCP. Expected to fail until FeltKit forwards it.
-  await scenario("[known gap] MCP: a replayed tools/call with the same idempotency key runs once", async () => {
+  // Published FeltKit 0.3.32 drops params._meta on /mcp (fixed on rkendel1/feltkit, test/mcp-idempotency.test.ts):
+  // there this is reported as a known platform gap; with the fix it passes.
+  await scenario("MCP: a replayed tools/call with the same idempotency key runs once", async () => {
     const key = { "dev.appport/idempotencyKey": `e2e-mcp-${Date.now()}` };
     const first = await mcp(claude, "chat_send", { code, text: "exactly once (mcp)" }, key);
     const replay = await mcp(claude, "chat_send", { code, text: "exactly once (mcp)" }, key);
-    if (replay.id !== first.id) throw Object.assign(new Error("MCP replay ran twice: _meta idempotency key not forwarded (platform gap)"), { known: true });
+    if (replay.id !== first.id) throw Object.assign(new Error("MCP replay ran twice: _meta idempotency key not forwarded (FeltKit ≤ 0.3.32)"), { known: true });
   });
 
   await scenario("agents cannot reach host or person operations over MCP; there is no tool for them", async () => {
