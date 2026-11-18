@@ -288,6 +288,7 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
       setOffline(false);
     } catch (error) {
       const e = error as { code?: string; message?: string; details?: { reason?: string } };
+      if (e.code === "UNAUTHORIZED") return finish("Your session ended. Sign in again to rejoin.", true); // signed out, revoked or expired
       if (e.code === "FAILED_PRECONDITION" || e.code === "NOT_FOUND") {
         const reason = e.details?.reason;
         if (reason === "expired") return reconnect();
