@@ -1,7 +1,13 @@
 # meetings
 
-> Status: a working MVP, not production-ready. [AUDIT.md](AUDIT.md) has the feature matrix against the
-> reference, security findings, reliability results, platform analysis and the P0/P1/P2 register.
+> Status: a working MVP, not production-ready. Phase 3.1 closure: [PHASE-3.1-CLOSURE.md](PHASE-3.1-CLOSURE.md)
+> (disposition, evidence, what is safe to claim) and [PHASE-3.1-GAPS.md](PHASE-3.1-GAPS.md); earlier audit in
+> [AUDIT.md](AUDIT.md); network lab in [docs/NETLAB.md](docs/NETLAB.md).
+>
+> **Platform dependency.** Session-bound presence (a participant whose session ends elsewhere leaves everyone's
+> call within a second) and MCP replay safety need FeltKit changes that are on `rkendel1/feltkit` but **not
+> published**. On published `@feltdb/feltkit` 0.3.32 the app works, but those two guarantees do not hold
+> (presence then ends by expiry, ~45–60 s) and `tests/session-bound.test.ts` fails by design.
 
 Video meetings in the browser that **people and agents attend together**, built with
 [FeltKit](https://www.npmjs.com/package/@feltdb/feltkit) (`npm create feltkit@latest meetings`).

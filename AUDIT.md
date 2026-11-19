@@ -443,3 +443,13 @@ owned; published 0.3.32 found none.
 - **Capacity on real devices:** run `scripts/capacity.mjs` per device class; this host measures 3.
 - **TURN credential scope:** relay credentials are valid for 4 h for whoever holds them; shorter TTL with
   renewal (`RTCPeerConnection.setConfiguration`) narrows reuse.
+
+---
+
+# Phase 3.1 (closure)
+
+See [PHASE-3.1-CLOSURE.md](PHASE-3.1-CLOSURE.md) for the disposition and evidence, and
+[PHASE-3.1-GAPS.md](PHASE-3.1-GAPS.md) for every gap's state (implemented, tested, pushed, merged, published,
+verified by the consuming application). Phase 3 figures above are superseded where those documents say so:
+session-end termination (now ~0.25 s on the unpublished FeltKit contract), the FeltKit suite (clean), and the
+measurement (recorded with an exact tool commit).

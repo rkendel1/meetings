@@ -1,0 +1,54 @@
+ACCEPTANCE app=9c3b06e feltkit=0.3.32(published) 2026-11-18T23:55:28Z
+== typecheck
+PASS
+== backend tests
+not ok 19 - the platform provides the caller's session to the application (ctx.auth.session)
+not ok 20 - only the creating session keeps a connection alive: another session's (replayed, forged) heartbeat is refused
+not ok 21 - a session's end ends exactly its connections: independent tabs and other people stay
+not ok 24 - when the last person's session ends, the call ends, although an agent attends
+# tests 29
+# pass 25
+# fail 4
+== build
+✓ Backend   .feltkit/build/functions.mjs  (20 functions, 9 capabilities, verified by loading the bundle)
+✓ Schema    5 collection(s) compile to a FeltDB state contract  (sha256:97c353acafee…; installed at start, or `feltkit migrate`)
+✓ Frontend  dist/client  (scanned: no server-only values)
+== measure --check (published tool)
+✓ platform skills current: 5 skill(s) match the installed FeltKit
+✓ generated code current: feltkit/_generated/api.ts matches what codegen writes
+✓ declarations match files: 8 declaration(s), each matches a file
+✓ every code file classified: every file with code has a class
+✓ acknowledged findings still exist: 1 acknowledged finding(s), each still present
+== e2e.mjs
+✓ two people connect media both ways; screen share reaches the other side (4.8 s)
+✓ an agent must join before it can read a running call; then it participates over MCP (0.5 s)
+✓ AppPort HTTP: a replayed call with the same idempotency key runs once; the same key with a new body is refused (0.0 s)
+⚠ (known platform gap) MCP: a replayed tools/call with the same idempotency key runs once: MCP replay ran twice: _meta idempotency key not forwarded (FeltKit ≤ 0.3.32)
+✓ agents cannot reach host or person operations over MCP; there is no tool for them (0.1 s)
+✓ a revoked agent session is refused at once (1.8 s)
+✓ a third person joins while another reloads: one tile each, all pairs connected, same call (3.6 s)
+✓ a short network drop: heartbeats and live queries recover, chat flows both ways (8.2 s)
+✓ a lost camera turns the camera off for everyone instead of freezing (0.1 s)
+✓ camera and microphone denied: the person joins without media and still receives others (3.7 s)
+✓ revoking access ejects a person from the live call (0.4 s)
+✓ offline past the presence timeout: the connection expires, then rejoins by itself (62.3 s)
+✓ the host's browser dies: the call goes on without them (42.5 s)
+✓ the last person pressing Leave ends the call although an agent attends; the recap is complete (0.2 s)
+13/14 scenarios passed, 1 known platform gap(s), 0 failure(s)
+== e2e-termination.mjs
+✓ access revoked by the host: self stopped in 255 ms, others closed in 254 ms (after a 129 ms action)
+✓ access revoked by the host [adversarial]: self n/a (ignores stop), others closed in 254 ms (after a 89 ms action); its own state: {"openPcs":1,"connectedPcs":1,"liveTracks":2}
+✓ removed by the host: self stopped in 257 ms, others closed in 256 ms (after a 84 ms action)
+✓ removed by the host [adversarial]: self n/a (ignores stop), others closed in 254 ms (after a 95 ms action); its own state: {"openPcs":1,"connectedPcs":1,"liveTracks":2}
+✗ signed out in another tab of the same browser: self stopped in 12142 ms, others closed NOT within bound (after a 223 ms action)
+✗ signed out in another tab of the same browser [adversarial]: self n/a (ignores stop), others closed NOT within bound (after a 287 ms action); its own state: {"openPcs":1,"connectedPcs":1,"liveTracks":2}
+✗ session revoked from another device: self stopped in 11880 ms, others closed NOT within bound (after a 341 ms action)
+✗ session revoked from another device [adversarial]: self n/a (ignores stop), others closed NOT within bound (after a 370 ms action); its own state: {"openPcs":1,"connectedPcs":1,"liveTracks":2}
+✓ forged heartbeats are refused: no credentials 401, invented token 401, another person's session 404 NOT_FOUND
+5/9 termination cases within bounds
+== e2e-session-expiry.mjs
+ "tileGoneAfterLastCheckInMs": 60035,
+ "tileGoneAfterExpiryMs": 54944,
+AssertionError [ERR_ASSERTION]: gone 54944 ms after the session expired (bound 8 s)
+== e2e-identity.mjs
+✓ identity: sign-up, refused wrong password, sign-in, use the app as the account, sign-out ends access
