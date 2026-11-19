@@ -19,7 +19,7 @@
     "e2e:identity": "node scripts/e2e-identity.mjs"
   },
   "dependencies": {
-    "@feltdb/feltkit": "^0.3.32",
+    "@feltdb/feltkit": "^0.3.34",
     "@feltdb/webllm": ">=0.22.0 <1.0.0",
     "@mlc-ai/web-llm": "^0.2.84",
     "react": "19.3.1",
