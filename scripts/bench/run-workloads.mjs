@@ -61,6 +61,7 @@ function descendants(pid) {
   }
 }
 function treeSample(pid) {
+  if (!Number.isInteger(pid) || pid <= 1) throw new Error(`no server process to sample (pid ${pid})`);
   const all = [pid, ...descendants(pid)].map(proc).filter(Boolean);
   return all.length ? { cpuS: all.reduce((a, s) => a + s.cpuS, 0), rssMb: all.reduce((a, s) => a + s.rssMb, 0), processes: all.length } : null;
 }
@@ -152,7 +153,8 @@ async function scenario(name, definition, body) {
   let samples = 0;
   let rssSum = 0;
   const timer = setInterval(() => {
-    const s = treeSample(PID);
+    let s = null;
+    try { s = treeSample(PID); } catch {}
     if (s) {
       peakRss = Math.max(peakRss, s.rssMb);
       rssSum += s.rssMb;
@@ -167,9 +169,11 @@ async function scenario(name, definition, body) {
     error = String(e.message ?? e).split("\n")[0];
   }
   clearInterval(timer);
-  const s1 = treeSample(PID);
+  let s1 = null;
+  try { s1 = treeSample(PID); } catch {}
   const durationS = (Date.now() - t0) / 1000;
-  const cpuS = s0 && s1 ? s1.cpuS - s0.cpuS : null;
+  // Across a restart the process changes: a before/after delta would mix two processes. The recovery scenario reports its own.
+  const cpuS = s0 && s1 && name !== "recovery" ? s1.cpuS - s0.cpuS : null;
   const row = {
     scenario: name,
     definition,
@@ -260,15 +264,26 @@ for (const name of SCENARIOS) {
       return { meetingsCompleted: { value: completed, unit: "meetings of 4", source: "observed" }, participantMinutes: { value: Number((participantSeconds / 60).toFixed(2)), unit: "participant-minutes", source: "calculated" }, burstWallSeconds: { value: Number(((Date.now() - t0) / 1000).toFixed(1)), unit: "s", source: "observed" } };
     });
   if (name === "recovery")
-    await scenario("recovery", "a 2-person call; the server process is killed (SIGKILL) and restarted; time until both rejoin and media reconnects", async () => {
-      if (!args.restart || !args["pid-command"]) throw new Error("recovery needs --restart and --pid-command");
+    await scenario("recovery", "a 2-person call; the server process is killed (SIGKILL); a supervisor restarts it once the old process has exited; time until the server is healthy and both participants are live in it again", async () => {
+      if (!args.restart || !args["pid-file"]) throw new Error("recovery needs --restart and --pid-file (the restart command writes the new pid there)");
       const a = await person();
       const b = await person();
       const m = await meeting(a, [b]);
+      const oldPid = PID;
+      const oldCpu = treeSample(oldPid).cpuS;
       const killedAt = Date.now();
-      try { process.kill(PID, "SIGKILL"); } catch {}
-      for (const c of descendants(PID)) try { process.kill(c, "SIGKILL"); } catch {}
-      execSync(args.restart, { stdio: "ignore" });
+      process.kill(oldPid, "SIGKILL");
+      // A supervisor (container runtime, systemd) restarts after the process has exited. FeltKit refuses to start a
+      // second process on the same state while the previous one is still listed (single writer).
+      let exitedMs = null;
+      for (let i = 0; i < 300 && exitedMs === null; i++) {
+        let state = null;
+        try { state = readFileSync(`/proc/${oldPid}/stat`, "utf8").split(") ")[1].split(" ")[0]; } catch {}
+        if (state === null) exitedMs = Date.now() - killedAt;
+        else await new Promise((r) => setTimeout(r, 100));
+      }
+      if (exitedMs === null) throw new Error(`pid ${oldPid} still present 30 s after SIGKILL (not reaped)`);
+      execSync(args.restart, { stdio: "ignore", shell: "/bin/sh" });
       let healthyMs = null;
       for (let i = 0; i < 600 && healthyMs === null; i++) {
         try {
@@ -277,18 +292,32 @@ for (const name of SCENARIOS) {
         } catch {}
         if (healthyMs === null) await new Promise((r) => setTimeout(r, 100));
       }
-      PID = Number(execSync(args["pid-command"]).toString().trim());
-      // Clients: both tabs reconnect by themselves (heartbeat → expired → rejoin, live queries reconnect).
-      let rejoinedMs = null;
-      for (let i = 0; i < 240 && rejoinedMs === null; i++) {
-        const ok = (await Promise.all(m.pages.map((p) => p.evaluate(() => document.querySelectorAll('.tile[data-state="connected"]').length).catch(() => 0)))).every((c) => c === 1);
-        const room = await Promise.all(m.pages.map((p) => p.locator(".room").count().catch(() => 0)));
-        if (ok && room.every((c) => c === 1) && Date.now() - killedAt > 2000) rejoinedMs = Date.now() - killedAt;
+      if (healthyMs === null) throw new Error("the server did not come back within 60 s");
+      PID = Number(readFileSync(args["pid-file"], "utf8").trim());
+      // Recovered: the restarted server has received a check-in from both participants (lastSeenAt after it came
+      // back); presence recorded before the crash would still read as live for up to 45 s and proves nothing.
+      let liveAgainMs = null;
+      for (let i = 0; i < 240 && liveAgainMs === null; i++) {
+        const live = await a.evaluate(async ({ code, since }) => {
+          const h = { "Content-Type": "application/json", "X-FeltKit-Session": "cookie" };
+          const s = await (await fetch("/api/session", { headers: h })).json();
+          const r = await fetch("/api/query/meetings:get", { method: "POST", headers: { ...h, "X-FeltKit-CSRF": s.csrf ?? "" }, body: JSON.stringify({ args: { code } }) });
+          const j = await r.json().catch(() => null);
+          return (j?.value?.peers ?? []).filter((p) => p.kind === "person" && p.lastSeenAt >= since).length;
+        }, { code: m.code, since: killedAt + healthyMs }).catch(() => 0);
+        if (live === 2) liveAgainMs = Date.now() - killedAt;
         else await new Promise((r) => setTimeout(r, 500));
       }
+      const newCpu = treeSample(PID).cpuS;
       await leave(m.pages);
       await close(m.pages);
-      return { serverHealthyAfterKillMs: { value: healthyMs, unit: "ms", source: "observed: first 200 on / after SIGKILL + restart" }, callConnectedAgainAfterKillMs: { value: rejoinedMs, unit: "ms", source: "observed: both tabs in a room with the other's tile connected" } };
+      return {
+        oldProcessExitedAfterKillMs: { value: exitedMs, unit: "ms", source: "observed: /proc/<old pid> gone" },
+        serverHealthyAfterKillMs: { value: healthyMs, unit: "ms", source: "observed: first 200 on / after SIGKILL, exit, restart" },
+        participantsCheckedInAgainAfterKillMs: { value: liveAgainMs, unit: "ms", source: "observed: meetings:get, both people with lastSeenAt after the restart (heartbeat interval 15 s)" },
+        restartCpuSeconds: { value: Number((newCpu + 0).toFixed(2)), unit: "CPU-s", source: "/proc: the new server process from its start to the end of the scenario" },
+        oldProcessCpuSecondsBeforeKill: { value: Number(oldCpu.toFixed(2)), unit: "CPU-s", source: "/proc: cumulative, the killed process" },
+      };
     });
 }
 await browser.close();

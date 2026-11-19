@@ -1,0 +1,94 @@
+{
+  "schema": "meetings.bench/1",
+  "deployment": "conventional (recovery), published @feltdb/feltkit 0.3.32, app 685a7d4",
+  "target": "http://localhost:3100",
+  "host": {
+    "cpus": 4,
+    "cpuModel": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "memGiB": 15.7,
+    "kernel": "6.18.44-fc-v653",
+    "node": "v22.23.5"
+  },
+  "note": "Browsers run on the same host as the server: they compete for CPU with it. Server figures are for the server process tree only; media is peer-to-peer.",
+  "scale": 1,
+  "results": [
+    {
+      "scenario": "recovery",
+      "definition": "a 2-person call; the server process is killed (SIGKILL); a supervisor restarts it once the old process has exited; time until the server is healthy and both participants are live in it again",
+      "period": {
+        "start": "2026-11-19T00:48:47.268Z",
+        "end": "2026-11-19T00:49:03.398Z",
+        "durationS": 16.1
+      },
+      "completed": true,
+      "error": null,
+      "observed": {
+        "serverCpuSeconds": {
+          "value": null,
+          "unit": "CPU-s",
+          "source": "/proc/<pid>/stat utime+stime, server process tree"
+        },
+        "serverCpuAvgCores": {
+          "value": null,
+          "unit": "cores",
+          "source": "calculated: CPU-s / duration"
+        },
+        "serverRssAvgMb": {
+          "value": 114.6,
+          "unit": "MiB",
+          "source": "/proc/<pid>/status VmRSS, sampled every 1000 ms"
+        },
+        "serverRssPeakMb": {
+          "value": 165.7,
+          "unit": "MiB",
+          "source": "same, maximum"
+        },
+        "appTrafficToServerBytes": {
+          "value": 128817,
+          "unit": "bytes",
+          "source": "counting TCP proxy in front of the server"
+        },
+        "appTrafficToClientsBytes": {
+          "value": 753229,
+          "unit": "bytes",
+          "source": "counting TCP proxy"
+        },
+        "appConnections": {
+          "value": 43,
+          "unit": "TCP connections",
+          "source": "counting TCP proxy"
+        },
+        "stateBytesDelta": {
+          "value": 120392,
+          "unit": "bytes",
+          "source": "size of the FeltDB state directory before/after"
+        },
+        "oldProcessExitedAfterKillMs": {
+          "value": 1706,
+          "unit": "ms",
+          "source": "observed: /proc/<old pid> gone"
+        },
+        "serverHealthyAfterKillMs": {
+          "value": 2139,
+          "unit": "ms",
+          "source": "observed: first 200 on / after SIGKILL, exit, restart"
+        },
+        "participantsCheckedInAgainAfterKillMs": {
+          "value": 12397,
+          "unit": "ms",
+          "source": "observed: meetings:get, both people with lastSeenAt after the restart (heartbeat interval 15 s)"
+        },
+        "restartCpuSeconds": {
+          "value": 0.82,
+          "unit": "CPU-s",
+          "source": "/proc: the new server process from its start to the end of the scenario"
+        },
+        "oldProcessCpuSecondsBeforeKill": {
+          "value": 1.17,
+          "unit": "CPU-s",
+          "source": "/proc: cumulative, the killed process"
+        }
+      }
+    }
+  ]
+}

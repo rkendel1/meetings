@@ -1,0 +1,235 @@
+{
+  "schema": "meetings.bench.cost/1",
+  "sourceResults": "docs/bench/conventional-results.json",
+  "rates": {
+    "vmMonthlyEur": {
+      "low": 3.79,
+      "high": 5.49,
+      "kind": "estimate (unverified)",
+      "source": "Third-party price aggregators for Hetzner Cloud shared-vCPU entry plans (CX22 ≈ €3.79–4.59, CX23 ≈ €5.49 after 2026 increases), excl. VAT; Hetzner's official page was not reached. Replace with the provider's current price.",
+      "shape": "2 vCPU (shared), 4 GiB RAM class; the smallest class that holds the measured footprint with headroom"
+    },
+    "hoursPerMonth": {
+      "value": 730,
+      "kind": "convention"
+    },
+    "turnUsdPerGb": {
+      "value": 0.05,
+      "freeGbPerMonth": 1000,
+      "kind": "published",
+      "source": "Cloudflare Realtime TURN docs (developers.cloudflare.com/realtime/turn/faq): $0.05/GB egress from Cloudflare to the TURN client, first 1,000 GB/month free (shared with SFU)"
+    },
+    "appboundry": {
+      "value": null,
+      "kind": "unavailable",
+      "source": "No published AppBoundry pricing; managed execution answers NO_EXECUTION_CAPACITY (rkendel1/feltkit docs/APPBOUNDRY.md). Not estimated."
+    }
+  },
+  "observedUnits": {
+    "idle": {
+      "cpuSeconds": 1.53,
+      "durationS": 600,
+      "rssAvgMiB": 88.8,
+      "rssPeakMiB": 107.7
+    },
+    "peakRssMiBAcrossScenarios": 183.6,
+    "perParticipantMinute": {
+      "small": {
+        "participantMinutes": 6,
+        "serverCpuSecondsPerPm": 0.1667,
+        "appTrafficKiBPerPm": 160.9,
+        "stateKiBPerPm": 39.4,
+        "peerToPeerMediaMiBPerPm": 5.01
+      },
+      "normal": {
+        "participantMinutes": 12,
+        "serverCpuSecondsPerPm": 0.1908,
+        "appTrafficKiBPerPm": 252.6,
+        "stateKiBPerPm": 54.1,
+        "peerToPeerMediaMiBPerPm": 6.33
+      },
+      "busy": {
+        "participantMinutes": 18,
+        "serverCpuSecondsPerPm": 0.1206,
+        "appTrafficKiBPerPm": 166.1,
+        "stateKiBPerPm": 39.4,
+        "peerToPeerMediaMiBPerPm": 4.74
+      }
+    }
+  },
+  "conventional": {
+    "perApplicationHourEur": {
+      "low": 0.00519,
+      "high": 0.00752,
+      "kind": "estimate: allocated instance"
+    },
+    "idle24hEur": {
+      "low": 0.1246,
+      "high": 0.1805,
+      "kind": "estimate: allocated instance; the observed idle CPU is 0.25% of one core"
+    },
+    "observedIdleUtilisation": {
+      "cpuCores": 0.0026,
+      "rssMiB": 88.8,
+      "kind": "observed"
+    },
+    "perActiveMeetingHourEur": {
+      "note": "With a fixed instance, the cost of a meeting-hour is the instance cost divided by the meeting-hours it carries: see projections. The marginal server CPU of a 4-person meeting-hour is observed",
+      "marginalCpuSecondsPerMeetingHour4p": 45.8
+    }
+  },
+  "appboundry": {
+    "meetings": null,
+    "reason": "Meetings cannot be built into an artifact (docs/bench/appboundry-build-refusal.txt); no AppBoundry pricing exists to apply. Runtime idle footprint for the same starter app: docs/bench/runtime-idle-starter.json."
+  },
+  "projections": [
+    {
+      "workload": "W0 idle all month",
+      "participantMinutes": 0,
+      "instanceEurPerMonth": {
+        "low": 3.79,
+        "high": 5.49,
+        "kind": "estimate: fixed, independent of use"
+      },
+      "serverCpuUtilisationOf2vCpu": {
+        "value": 0.128,
+        "unit": "%",
+        "kind": "calculated from observed CPU-s per participant-minute; not a capacity claim"
+      },
+      "eurPer1000ParticipantMinutes": null,
+      "stateGrowthMiB": {
+        "value": 0,
+        "kind": "calculated from observed state growth per participant-minute"
+      },
+      "turnRelayIfNeeded": {
+        "relayShare0%": {
+          "relayedGb": 0,
+          "usd": 0
+        },
+        "relayShare20%": {
+          "relayedGb": 0,
+          "usd": 0
+        },
+        "relayShare100%": {
+          "relayedGb": 0,
+          "usd": 0
+        },
+        "kind": "calculated at stated relay shares (parameters, not observations); media per participant-minute observed with fake video"
+      }
+    },
+    {
+      "workload": "W1 20 meeting-hours/month, 4 people",
+      "participantMinutes": 4800,
+      "instanceEurPerMonth": {
+        "low": 3.79,
+        "high": 5.49,
+        "kind": "estimate: fixed, independent of use"
+      },
+      "serverCpuUtilisationOf2vCpu": {
+        "value": 0.145,
+        "unit": "%",
+        "kind": "calculated from observed CPU-s per participant-minute; not a capacity claim"
+      },
+      "eurPer1000ParticipantMinutes": {
+        "low": 0.7896,
+        "high": 1.1438,
+        "kind": "estimate: allocated instance cost / participant-minutes"
+      },
+      "stateGrowthMiB": {
+        "value": 253.6,
+        "kind": "calculated from observed state growth per participant-minute"
+      },
+      "turnRelayIfNeeded": {
+        "relayShare0%": {
+          "relayedGb": 0,
+          "usd": 0
+        },
+        "relayShare20%": {
+          "relayedGb": 5.9,
+          "usd": 0
+        },
+        "relayShare100%": {
+          "relayedGb": 29.7,
+          "usd": 0
+        },
+        "kind": "calculated at stated relay shares (parameters, not observations); media per participant-minute observed with fake video"
+      }
+    },
+    {
+      "workload": "W2 200 meeting-hours/month, 4 people",
+      "participantMinutes": 48000,
+      "instanceEurPerMonth": {
+        "low": 3.79,
+        "high": 5.49,
+        "kind": "estimate: fixed, independent of use"
+      },
+      "serverCpuUtilisationOf2vCpu": {
+        "value": 0.302,
+        "unit": "%",
+        "kind": "calculated from observed CPU-s per participant-minute; not a capacity claim"
+      },
+      "eurPer1000ParticipantMinutes": {
+        "low": 0.079,
+        "high": 0.1144,
+        "kind": "estimate: allocated instance cost / participant-minutes"
+      },
+      "stateGrowthMiB": {
+        "value": 2535.9,
+        "kind": "calculated from observed state growth per participant-minute"
+      },
+      "turnRelayIfNeeded": {
+        "relayShare0%": {
+          "relayedGb": 0,
+          "usd": 0
+        },
+        "relayShare20%": {
+          "relayedGb": 59.3,
+          "usd": 0
+        },
+        "relayShare100%": {
+          "relayedGb": 296.7,
+          "usd": 0
+        },
+        "kind": "calculated at stated relay shares (parameters, not observations); media per participant-minute observed with fake video"
+      }
+    },
+    {
+      "workload": "W3 2,000 meeting-hours/month, 4 people",
+      "participantMinutes": 480000,
+      "instanceEurPerMonth": {
+        "low": 3.79,
+        "high": 5.49,
+        "kind": "estimate: fixed, independent of use"
+      },
+      "serverCpuUtilisationOf2vCpu": {
+        "value": 1.87,
+        "unit": "%",
+        "kind": "calculated from observed CPU-s per participant-minute; not a capacity claim"
+      },
+      "eurPer1000ParticipantMinutes": {
+        "low": 0.0079,
+        "high": 0.0114,
+        "kind": "estimate: allocated instance cost / participant-minutes"
+      },
+      "stateGrowthMiB": {
+        "value": 25359.4,
+        "kind": "calculated from observed state growth per participant-minute"
+      },
+      "turnRelayIfNeeded": {
+        "relayShare0%": {
+          "relayedGb": 0,
+          "usd": 0
+        },
+        "relayShare20%": {
+          "relayedGb": 593.4,
+          "usd": 0
+        },
+        "relayShare100%": {
+          "relayedGb": 2967.2,
+          "usd": 98.36
+        },
+        "kind": "calculated at stated relay shares (parameters, not observations); media per participant-minute observed with fake video"
+      }
+    }
+  ]
+}

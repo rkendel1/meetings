@@ -1,0 +1,10 @@
+$ npx feltkit build --target appboundry   (meetings 685a7d4, @feltdb/feltkit 0.3.32, 2026-11-19T00:49:15Z)
+feltkit build 0.3.32
+✓ Backend   .feltkit/build/functions.mjs  (20 functions, 9 capabilities, verified by loading the bundle)
+✓ Schema    5 collection(s) compile to a FeltDB state contract  (sha256:97c353acafee…; installed at start, or `feltkit migrate`)
+✓ Frontend  dist/client  (scanned: no server-only values)
+✗ This application uses FeltKit features an AppBoundry artifact cannot provide:
+  feltkit/media.ts:26: app.action runs in the FeltKit server (it may call the model and stream to its caller); an artifact runs transactions only. Keep actions in a FeltKit deployment, or remove them before building for AppBoundry.
+  app.integration("turn"): integrations call external HTTP APIs, and an artifact has no network access. Run this application with FeltKit, or remove the integration.
+  hint: Each one names where it is used. The artifact would behave differently from your application, so nothing was built.
+exit 1

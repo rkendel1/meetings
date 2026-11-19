@@ -1,0 +1,516 @@
+{
+  "schema": "meetings.bench/1",
+  "deployment": "conventional: feltkit start from .feltkit/deploy (container target, Node path), published @feltdb/feltkit 0.3.32, app 685a7d4",
+  "target": "http://localhost:3100",
+  "host": {
+    "cpus": 4,
+    "cpuModel": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "memGiB": 15.7,
+    "kernel": "6.18.44-fc-v653",
+    "node": "v22.23.5"
+  },
+  "note": "Browsers run on the same host as the server: they compete for CPU with it. Server figures are for the server process tree only; media is peer-to-peer.",
+  "scale": 1,
+  "results": [
+    {
+      "scenario": "idle",
+      "definition": "deployed, no clients, 600 s",
+      "period": {
+        "start": "2026-11-19T00:22:59.557Z",
+        "end": "2026-11-19T00:32:59.567Z",
+        "durationS": 600
+      },
+      "completed": true,
+      "error": null,
+      "observed": {
+        "serverCpuSeconds": {
+          "value": 1.53,
+          "unit": "CPU-s",
+          "source": "/proc/<pid>/stat utime+stime, server process tree"
+        },
+        "serverCpuAvgCores": {
+          "value": 0.0025,
+          "unit": "cores",
+          "source": "calculated: CPU-s / duration"
+        },
+        "serverRssAvgMb": {
+          "value": 88.8,
+          "unit": "MiB",
+          "source": "/proc/<pid>/status VmRSS, sampled every 1000 ms"
+        },
+        "serverRssPeakMb": {
+          "value": 107.7,
+          "unit": "MiB",
+          "source": "same, maximum"
+        },
+        "appTrafficToServerBytes": {
+          "value": 0,
+          "unit": "bytes",
+          "source": "counting TCP proxy in front of the server"
+        },
+        "appTrafficToClientsBytes": {
+          "value": 0,
+          "unit": "bytes",
+          "source": "counting TCP proxy"
+        },
+        "appConnections": {
+          "value": 0,
+          "unit": "TCP connections",
+          "source": "counting TCP proxy"
+        },
+        "stateBytesDelta": {
+          "value": 0,
+          "unit": "bytes",
+          "source": "size of the FeltDB state directory before/after"
+        }
+      }
+    },
+    {
+      "scenario": "light",
+      "definition": "3 signed-in people on the home page (live queries open), no meetings, 180 s",
+      "period": {
+        "start": "2026-11-19T00:32:59.575Z",
+        "end": "2026-11-19T00:36:00.943Z",
+        "durationS": 181.4
+      },
+      "completed": true,
+      "error": null,
+      "observed": {
+        "serverCpuSeconds": {
+          "value": 0.67,
+          "unit": "CPU-s",
+          "source": "/proc/<pid>/stat utime+stime, server process tree"
+        },
+        "serverCpuAvgCores": {
+          "value": 0.0037,
+          "unit": "cores",
+          "source": "calculated: CPU-s / duration"
+        },
+        "serverRssAvgMb": {
+          "value": 145.3,
+          "unit": "MiB",
+          "source": "/proc/<pid>/status VmRSS, sampled every 1000 ms"
+        },
+        "serverRssPeakMb": {
+          "value": 146.2,
+          "unit": "MiB",
+          "source": "same, maximum"
+        },
+        "appTrafficToServerBytes": {
+          "value": 22464,
+          "unit": "bytes",
+          "source": "counting TCP proxy in front of the server"
+        },
+        "appTrafficToClientsBytes": {
+          "value": 933615,
+          "unit": "bytes",
+          "source": "counting TCP proxy"
+        },
+        "appConnections": {
+          "value": 9,
+          "unit": "TCP connections",
+          "source": "counting TCP proxy"
+        },
+        "stateBytesDelta": {
+          "value": 14691,
+          "unit": "bytes",
+          "source": "size of the FeltDB state directory before/after"
+        },
+        "signedInUsers": {
+          "value": 3,
+          "unit": "users",
+          "source": "workload definition"
+        }
+      }
+    },
+    {
+      "scenario": "small",
+      "definition": "one meeting, 2 participants, 180 s in call",
+      "period": {
+        "start": "2026-11-19T00:36:00.950Z",
+        "end": "2026-11-19T00:39:04.740Z",
+        "durationS": 183.8
+      },
+      "completed": true,
+      "error": null,
+      "observed": {
+        "serverCpuSeconds": {
+          "value": 1,
+          "unit": "CPU-s",
+          "source": "/proc/<pid>/stat utime+stime, server process tree"
+        },
+        "serverCpuAvgCores": {
+          "value": 0.0054,
+          "unit": "cores",
+          "source": "calculated: CPU-s / duration"
+        },
+        "serverRssAvgMb": {
+          "value": 150.9,
+          "unit": "MiB",
+          "source": "/proc/<pid>/status VmRSS, sampled every 1000 ms"
+        },
+        "serverRssPeakMb": {
+          "value": 151.7,
+          "unit": "MiB",
+          "source": "same, maximum"
+        },
+        "appTrafficToServerBytes": {
+          "value": 177165,
+          "unit": "bytes",
+          "source": "counting TCP proxy in front of the server"
+        },
+        "appTrafficToClientsBytes": {
+          "value": 811696,
+          "unit": "bytes",
+          "source": "counting TCP proxy"
+        },
+        "appConnections": {
+          "value": 72,
+          "unit": "TCP connections",
+          "source": "counting TCP proxy"
+        },
+        "stateBytesDelta": {
+          "value": 241909,
+          "unit": "bytes",
+          "source": "size of the FeltDB state directory before/after"
+        },
+        "participants": {
+          "value": 2,
+          "unit": "people",
+          "source": "workload"
+        },
+        "connectedMs": {
+          "value": 2782,
+          "unit": "ms",
+          "source": "observed: all tiles connected"
+        },
+        "participantMinutes": {
+          "value": 6,
+          "unit": "participant-minutes",
+          "source": "calculated: participants × seconds in call / 60"
+        },
+        "meetingMinutes": {
+          "value": 3,
+          "unit": "meeting-minutes",
+          "source": "calculated"
+        },
+        "peerToPeerMediaBytes": {
+          "value": 31524401,
+          "unit": "bytes",
+          "source": "browsers' outbound-rtp bytesSent (never through the server)"
+        }
+      }
+    },
+    {
+      "scenario": "normal",
+      "definition": "one meeting, 4 participants, 180 s in call",
+      "period": {
+        "start": "2026-11-19T00:39:04.749Z",
+        "end": "2026-11-19T00:42:10.026Z",
+        "durationS": 185.3
+      },
+      "completed": true,
+      "error": null,
+      "observed": {
+        "serverCpuSeconds": {
+          "value": 2.29,
+          "unit": "CPU-s",
+          "source": "/proc/<pid>/stat utime+stime, server process tree"
+        },
+        "serverCpuAvgCores": {
+          "value": 0.0124,
+          "unit": "cores",
+          "source": "calculated: CPU-s / duration"
+        },
+        "serverRssAvgMb": {
+          "value": 172.9,
+          "unit": "MiB",
+          "source": "/proc/<pid>/status VmRSS, sampled every 1000 ms"
+        },
+        "serverRssPeakMb": {
+          "value": 175.1,
+          "unit": "MiB",
+          "source": "same, maximum"
+        },
+        "appTrafficToServerBytes": {
+          "value": 690280,
+          "unit": "bytes",
+          "source": "counting TCP proxy in front of the server"
+        },
+        "appTrafficToClientsBytes": {
+          "value": 2413212,
+          "unit": "bytes",
+          "source": "counting TCP proxy"
+        },
+        "appConnections": {
+          "value": 141,
+          "unit": "TCP connections",
+          "source": "counting TCP proxy"
+        },
+        "stateBytesDelta": {
+          "value": 665111,
+          "unit": "bytes",
+          "source": "size of the FeltDB state directory before/after"
+        },
+        "participants": {
+          "value": 4,
+          "unit": "people",
+          "source": "workload"
+        },
+        "connectedMs": {
+          "value": 3080,
+          "unit": "ms",
+          "source": "observed: all tiles connected"
+        },
+        "participantMinutes": {
+          "value": 12,
+          "unit": "participant-minutes",
+          "source": "calculated: participants × seconds in call / 60"
+        },
+        "meetingMinutes": {
+          "value": 3,
+          "unit": "meeting-minutes",
+          "source": "calculated"
+        },
+        "peerToPeerMediaBytes": {
+          "value": 79696702,
+          "unit": "bytes",
+          "source": "browsers' outbound-rtp bytesSent (never through the server)"
+        }
+      }
+    },
+    {
+      "scenario": "busy",
+      "definition": "3 simultaneous meetings × 2 participants, 180 s",
+      "period": {
+        "start": "2026-11-19T00:42:10.033Z",
+        "end": "2026-11-19T00:45:21.315Z",
+        "durationS": 191.3
+      },
+      "completed": true,
+      "error": null,
+      "observed": {
+        "serverCpuSeconds": {
+          "value": 2.17,
+          "unit": "CPU-s",
+          "source": "/proc/<pid>/stat utime+stime, server process tree"
+        },
+        "serverCpuAvgCores": {
+          "value": 0.0113,
+          "unit": "cores",
+          "source": "calculated: CPU-s / duration"
+        },
+        "serverRssAvgMb": {
+          "value": 179.9,
+          "unit": "MiB",
+          "source": "/proc/<pid>/status VmRSS, sampled every 1000 ms"
+        },
+        "serverRssPeakMb": {
+          "value": 180.4,
+          "unit": "MiB",
+          "source": "same, maximum"
+        },
+        "appTrafficToServerBytes": {
+          "value": 540217,
+          "unit": "bytes",
+          "source": "counting TCP proxy in front of the server"
+        },
+        "appTrafficToClientsBytes": {
+          "value": 2522158,
+          "unit": "bytes",
+          "source": "counting TCP proxy"
+        },
+        "appConnections": {
+          "value": 198,
+          "unit": "TCP connections",
+          "source": "counting TCP proxy"
+        },
+        "stateBytesDelta": {
+          "value": 727101,
+          "unit": "bytes",
+          "source": "size of the FeltDB state directory before/after"
+        },
+        "meetings": {
+          "value": 3,
+          "unit": "meetings",
+          "source": "workload"
+        },
+        "participants": {
+          "value": 6,
+          "unit": "people",
+          "source": "workload"
+        },
+        "allConnected": {
+          "value": true,
+          "unit": "bool",
+          "source": "observed"
+        },
+        "participantMinutes": {
+          "value": 18,
+          "unit": "participant-minutes",
+          "source": "calculated: participants × seconds in call / 60"
+        },
+        "meetingMinutes": {
+          "value": 9,
+          "unit": "meeting-minutes",
+          "source": "calculated"
+        },
+        "peerToPeerMediaBytes": {
+          "value": 89508413,
+          "unit": "bytes",
+          "source": "browsers' outbound-rtp"
+        }
+      }
+    },
+    {
+      "scenario": "burst",
+      "definition": "8 people arrive one after another, form 4 meetings of 2, stay 30 s each, leave",
+      "period": {
+        "start": "2026-11-19T00:45:21.322Z",
+        "end": "2026-11-19T00:46:10.315Z",
+        "durationS": 49
+      },
+      "completed": true,
+      "error": null,
+      "observed": {
+        "serverCpuSeconds": {
+          "value": 1.4,
+          "unit": "CPU-s",
+          "source": "/proc/<pid>/stat utime+stime, server process tree"
+        },
+        "serverCpuAvgCores": {
+          "value": 0.0286,
+          "unit": "cores",
+          "source": "calculated: CPU-s / duration"
+        },
+        "serverRssAvgMb": {
+          "value": 183.2,
+          "unit": "MiB",
+          "source": "/proc/<pid>/status VmRSS, sampled every 1000 ms"
+        },
+        "serverRssPeakMb": {
+          "value": 183.6,
+          "unit": "MiB",
+          "source": "same, maximum"
+        },
+        "appTrafficToServerBytes": {
+          "value": 363903,
+          "unit": "bytes",
+          "source": "counting TCP proxy in front of the server"
+        },
+        "appTrafficToClientsBytes": {
+          "value": 2878694,
+          "unit": "bytes",
+          "source": "counting TCP proxy"
+        },
+        "appConnections": {
+          "value": 82,
+          "unit": "TCP connections",
+          "source": "counting TCP proxy"
+        },
+        "stateBytesDelta": {
+          "value": 529718,
+          "unit": "bytes",
+          "source": "size of the FeltDB state directory before/after"
+        },
+        "meetingsCompleted": {
+          "value": 4,
+          "unit": "meetings of 4",
+          "source": "observed"
+        },
+        "participantMinutes": {
+          "value": 4,
+          "unit": "participant-minutes",
+          "source": "calculated"
+        },
+        "burstWallSeconds": {
+          "value": 49,
+          "unit": "s",
+          "source": "observed"
+        }
+      }
+    },
+    {
+      "scenario": "recovery",
+      "definition": "a 2-person call; the server process is killed (SIGKILL); a supervisor restarts it once the old process has exited; time until the server is healthy and both participants are live in it again",
+      "period": {
+        "start": "2026-11-19T00:48:47.268Z",
+        "end": "2026-11-19T00:49:03.398Z",
+        "durationS": 16.1
+      },
+      "completed": true,
+      "error": null,
+      "observed": {
+        "serverCpuSeconds": {
+          "value": null,
+          "unit": "CPU-s",
+          "source": "/proc/<pid>/stat utime+stime, server process tree"
+        },
+        "serverCpuAvgCores": {
+          "value": null,
+          "unit": "cores",
+          "source": "calculated: CPU-s / duration"
+        },
+        "serverRssAvgMb": {
+          "value": 114.6,
+          "unit": "MiB",
+          "source": "/proc/<pid>/status VmRSS, sampled every 1000 ms"
+        },
+        "serverRssPeakMb": {
+          "value": 165.7,
+          "unit": "MiB",
+          "source": "same, maximum"
+        },
+        "appTrafficToServerBytes": {
+          "value": 128817,
+          "unit": "bytes",
+          "source": "counting TCP proxy in front of the server"
+        },
+        "appTrafficToClientsBytes": {
+          "value": 753229,
+          "unit": "bytes",
+          "source": "counting TCP proxy"
+        },
+        "appConnections": {
+          "value": 43,
+          "unit": "TCP connections",
+          "source": "counting TCP proxy"
+        },
+        "stateBytesDelta": {
+          "value": 120392,
+          "unit": "bytes",
+          "source": "size of the FeltDB state directory before/after"
+        },
+        "oldProcessExitedAfterKillMs": {
+          "value": 1706,
+          "unit": "ms",
+          "source": "observed: /proc/<old pid> gone"
+        },
+        "serverHealthyAfterKillMs": {
+          "value": 2139,
+          "unit": "ms",
+          "source": "observed: first 200 on / after SIGKILL, exit, restart"
+        },
+        "participantsCheckedInAgainAfterKillMs": {
+          "value": 12397,
+          "unit": "ms",
+          "source": "observed: meetings:get, both people with lastSeenAt after the restart (heartbeat interval 15 s)"
+        },
+        "restartCpuSeconds": {
+          "value": 0.82,
+          "unit": "CPU-s",
+          "source": "/proc: the new server process from its start to the end of the scenario"
+        },
+        "oldProcessCpuSecondsBeforeKill": {
+          "value": 1.17,
+          "unit": "CPU-s",
+          "source": "/proc: cumulative, the killed process"
+        }
+      },
+      "note": "Re-run with the fixed harness (scripts/bench/run-workloads.mjs). The first run restarted the server before the killed process had exited; FeltKit correctly refused a second process on the same state, no new pid was found, and the harness sampled pid 0 (kernel threads): its CPU figure (274 CPU-s) and rejoin time were invalid and are discarded."
+    }
+  ],
+  "recoveryRerun": {
+    "file": "docs/bench/conventional-recovery.json"
+  }
+}
