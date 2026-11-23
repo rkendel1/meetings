@@ -62,7 +62,7 @@ test("people start, share and end a call; the recap keeps attendance and the tim
 test("an agent attends a live call, follows the timeline and leaves notes; it never keeps a call open", async () => {
   const t = await createTestApp();
   try {
-    const m = await t.as("ada").mutation(api.meetings.create, { title: "Planning" });
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "Planning", agents: "open" });
     await assert.rejects(t.as(claude).mutation(api.calls.join, { code: m.code }), /No call is running/);
     await assert.rejects(t.as(claude).mutation(api.meetings.create, { title: "x" }), (e: any) => e.code === "FORBIDDEN");
 

@@ -209,3 +209,14 @@ button.round.danger { background: #d92d20; color: #fff; width: 58px; border-radi
   button.round { width: 42px; height: 42px; }
 }
 .offline-badge { background: #78350f; color: #fde68a; }
+
+/* Records, recording, search */
+.recording-badge { background: color-mix(in srgb, #dc2626 16%, transparent); color: #dc2626; font-weight: 600; }
+.panel-h { font-size: 13px; margin: 14px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.note.action { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.note.action.done .message-text, .note.action.cancelled .message-text { text-decoration: line-through; color: var(--muted); }
+.check-line { display: flex; align-items: center; gap: 6px; padding: 4px 12px 8px; }
+.summary-text { white-space: pre-wrap; }
+ul.plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+ul.hits li { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.chat-form { flex-wrap: wrap; }

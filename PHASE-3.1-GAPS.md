@@ -1,5 +1,10 @@
 # Phase 3.1 gap register
 
+> **Update 2026-11-23.** G1, G1a, G2 and G4 are in published `@feltdb/feltkit` 0.3.37 (verified by the application's
+> backend tests and `measure --check`; browser evidence not re-run). G7, G10, G11 and G13 are unchanged. G12 is
+> app-side and still open. The state column below is as of 2026-11-18. See docs/UPSTREAM-ASKS.md.
+
+
 Every gap left open after Phase 3, with its disposition. States are kept separate:
 
 - **implemented** — code exists on a branch

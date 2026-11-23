@@ -31,6 +31,10 @@ try {
   const code = page.url().split("/m/")[1];
   await page.getByRole("button", { name: "Start the call" }).click();
   await page.locator(".room").waitFor();
+  await page.getByRole("tab", { name: /^People/ }).click(); // agents attend only with the host's approval
+  await page.getByLabel("Agents").selectOption("open");
+  await page.getByRole("button", { name: "Save access" }).click();
+  await page.getByRole("button", { name: "Saved" }).waitFor();
 
   let lastOk = 0;
   let refusedAt = null;

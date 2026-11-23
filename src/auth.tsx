@@ -4,6 +4,7 @@ import { useFeltKit } from "@feltdb/feltkit/react";
 import { describe } from "./util";
 
 export function SignedOut(props: {
+  brand?: { name: string; tagline?: string | undefined; logo?: string | undefined };
   devUsers: Array<{ id: string; name: string; roles: string[] }>;
   accounts: { signUp: boolean; email?: boolean; providers?: Array<{ id: string; name: string }> } | null;
   onDevSignIn: (id: string) => void;
@@ -13,6 +14,13 @@ export function SignedOut(props: {
   return (
     <div className="center">
       <div className="card narrow">
+        {props.brand && (
+          <div className="stack" style={{ alignItems: "center", textAlign: "center", marginBottom: 12 }}>
+            {props.brand.logo && <img src={props.brand.logo} alt="" width={48} height={48} style={{ objectFit: "contain" }} />}
+            <strong>{props.brand.name}</strong>
+            {props.brand.tagline && <span className="muted small-text">{props.brand.tagline}</span>}
+          </div>
+        )}
         {props.devUsers.length ? (
           <>
             <h1>Sign in</h1>

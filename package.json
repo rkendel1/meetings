@@ -16,10 +16,12 @@
     "netlab": "sudo scripts/netlab/run.sh",
     "e2e:expiry": "node scripts/e2e-session-expiry.mjs",
     "capacity": "node scripts/capacity.mjs",
-    "e2e:identity": "node scripts/e2e-identity.mjs"
+    "e2e:identity": "node scripts/e2e-identity.mjs",
+    "e2e:starter": "node scripts/e2e-starter.mjs",
+    "measure": "feltkit measure"
   },
   "dependencies": {
-    "@feltdb/feltkit": "^0.3.34",
+    "@feltdb/feltkit": "^0.3.37",
     "@feltdb/webllm": ">=0.22.0 <1.0.0",
     "@mlc-ai/web-llm": "^0.2.84",
     "react": "19.3.1",

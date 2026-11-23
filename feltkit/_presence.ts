@@ -70,6 +70,16 @@ export async function endPeer(ctx: any, peer: Peer, at: number, reason: LeftReas
 }
 
 /**
+ * End a call: stamp it, stop a recording still running, and hand the finished call to the scribe (feltkit/agents.ts),
+ * which writes its recap after this commits. Every way a call ends goes through here.
+ */
+export async function finishCall(ctx: any, call: Call, endedAt: number) {
+  const recording = call.recording && call.recording.stoppedAt === undefined ? { recording: { ...call.recording, stoppedAt: endedAt } } : {};
+  await ctx.db.patch(calls, call.id, { endedAt, open: false, ...recording });
+  ctx.afterCommit.agent("scribe", { callId: call.id });
+}
+
+/**
  * Settle the latest call: connections that stopped checking in are marked expired (at their last
  * check-in), and the call is ended when no person is left and either `final` (the last person pressed
  * Leave) or the grace period has passed. Returns the call if it is still open.
@@ -82,7 +92,7 @@ export async function settle(ctx: any, meeting: Meeting, now: number, options: {
   if (state.people.length > 0) return call;
   if (!options.final && now - state.lastPersonAt < GRACE_MS) return call;
   const endedAt = options.final ? now : Math.min(now, state.lastPersonAt + GRACE_MS);
-  await ctx.db.patch(calls, call.id, { endedAt });
+  await finishCall(ctx, call, endedAt);
   for (const p of state.peers) if (p.leftAt === undefined && isLive(p, now)) await endPeer(ctx, p, endedAt, "ended");
   return null;
 }

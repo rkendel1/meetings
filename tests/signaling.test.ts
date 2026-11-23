@@ -13,7 +13,7 @@ const realNow = Date.now;
 
 async function pair() {
   const t = await createTestApp();
-  const m = await t.as("ada").mutation(api.meetings.create, { title: "Signals" });
+  const m = await t.as("ada").mutation(api.meetings.create, { title: "Signals", agents: "open" });
   const a = await t.as("ada").mutation(api.calls.join, { code: m.code });
   const g = await t.as("grace").mutation(api.calls.join, { code: m.code });
   const [lo, hi] = a.peerId < g.peerId ? [{ who: "ada", id: a.peerId }, { who: "grace", id: g.peerId }] : [{ who: "grace", id: g.peerId }, { who: "ada", id: a.peerId }];

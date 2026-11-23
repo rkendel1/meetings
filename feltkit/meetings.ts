@@ -1,6 +1,8 @@
 import { fail, s } from "@feltdb/feltkit";
 import { calls, entries, meetings } from "./app.js";
 import { append, callState, endPeer, kindOf, latestCall, mayAttend, mayReadCall, meetingFor, nameOf, newCode, type Call, type Meeting } from "./_meeting.js";
+import { actionItems, decisions, purgeMeeting, summaries } from "./_records.js";
+import { peers } from "./_presence.js";
 import { CallOut, EntryOut, MeetingOut, PeerOut, strip, stripEntry, stripPeer } from "./_schemas.js";
 import { app } from "./app.js";
 
@@ -37,16 +39,17 @@ export const create = app.mutation({
     title: s.string({ minLength: 1, maxLength: 120 }),
     access: s.optional(s.enum(["link", "invited"] as const)),
     invited: s.optional(s.array(s.string({ minLength: 1, maxLength: 120 }), { maxItems: 100 })),
+    agents: s.optional(s.enum(["approved", "open"] as const)),
     scheduledFor: s.optional(s.number()),
   },
   returns: MeetingOut,
-  handler: async (ctx, { title, access, invited, scheduledFor }) => {
+  handler: async (ctx, { title, access, invited, agents, scheduledFor }) => {
     const me = ctx.auth.requirePrincipal();
     if (kindOf(me) === "agent") fail("FORBIDDEN", "Agents attend meetings; people create them.");
     let code = newCode();
     for (let i = 0; i < 5 && (await ctx.db.find(meetings, { code }, { limit: 1 })).length; i++) code = newCode();
     const guests = [...new Set((invited ?? []).map((x: string) => x.trim()).filter((x: string) => x && x !== me.id))];
-    const record = { code, title: title.trim(), hostId: me.id, hostName: nameOf(me), access: access ?? "link", invited: guests, ...(scheduledFor ? { scheduledFor } : {}), createdAt: Date.now() };
+    const record = { code, title: title.trim(), hostId: me.id, hostName: nameOf(me), access: access ?? "link", invited: guests, agents: agents ?? "approved", ...(scheduledFor ? { scheduledFor } : {}), createdAt: Date.now() };
     const id = await ctx.db.insert(meetings, record);
     for (const recipient of guests) {
       ctx.afterCommit.notifications.send({ recipient, type: "meeting.invited", title: `${nameOf(me)} invited you to "${record.title}"`, data: { code }, idempotencyKey: `invite:${id}:${recipient}` });
@@ -58,7 +61,7 @@ export const create = app.mutation({
 /** The host changes who may attend. */
 export const update = app.mutation({
   access: "meetings.create",
-  args: { code: s.string({ maxLength: 64 }), title: s.optional(s.string({ minLength: 1, maxLength: 120 })), access: s.optional(s.enum(["link", "invited"] as const)), invited: s.optional(s.array(s.string({ minLength: 1, maxLength: 120 }), { maxItems: 100 })) },
+  args: { code: s.string({ maxLength: 64 }), title: s.optional(s.string({ minLength: 1, maxLength: 120 })), access: s.optional(s.enum(["link", "invited"] as const)), agents: s.optional(s.enum(["approved", "open"] as const)), invited: s.optional(s.array(s.string({ minLength: 1, maxLength: 120 }), { maxItems: 100 })) },
   returns: MeetingOut,
   retry: { sequenceConflicts: 5 },
   handler: async (ctx, args) => {
@@ -69,13 +72,13 @@ export const update = app.mutation({
     for (const recipient of invited.filter((x: string) => !meeting.invited.includes(x))) {
       ctx.afterCommit.notifications.send({ recipient, type: "meeting.invited", title: `${nameOf(me)} invited you to "${meeting.title}"`, data: { code: meeting.code }, idempotencyKey: `invite:${meeting.id}:${recipient}` });
     }
-    const next = (await ctx.db.patch(meetings, meeting.id, { ...(args.title ? { title: args.title.trim() } : {}), ...(args.access ? { access: args.access } : {}), invited })) as Meeting;
+    const next = (await ctx.db.patch(meetings, meeting.id, { ...(args.title ? { title: args.title.trim() } : {}), ...(args.access ? { access: args.access } : {}), ...(args.agents ? { agents: args.agents } : {}), invited })) as Meeting;
     // Revocation takes effect now: whoever may no longer attend leaves the live call.
     const call = await latestCall(ctx, meeting.id);
     if (call && call.endedAt === undefined) {
       const now = Date.now();
       for (const p of (await callState(ctx, call, now)).peers) {
-        if (p.leftAt !== undefined || mayAttend(next, p.principalId)) continue;
+        if (p.leftAt !== undefined || mayAttend(next, p.principalId, p.kind)) continue;
         await endPeer(ctx, p, now, "removed");
         await append(ctx, next, { callId: call.id, kind: "system", text: `${p.name} no longer has access and left the call` });
       }
@@ -167,6 +170,43 @@ export const recap = app.query({
       attendance: [...byWho.values()].sort((a, b) => a.firstJoinedAt - b.firstJoinedAt).map(({ ms, ...a }) => ({ ...a, minutes: Math.round(ms / 6000) / 10 })),
       entries: timeline.map(stripEntry),
       calls: all.map(strip),
+    };
+  },
+});
+
+/** Delete a meeting and everything it kept: timeline, summaries, decisions, action items. The host's, once no call is running. */
+export const remove = app.mutation({
+  access: "meetings.create",
+  args: { code: s.string({ maxLength: 64 }) },
+  returns: s.object({ deleted: s.integer() }),
+  handler: async (ctx, { code }) => {
+    const meeting = await meetingFor(ctx, code);
+    const me = ctx.auth.requirePrincipal();
+    if (meeting.hostId !== me.id) fail("FORBIDDEN", "Only the host can delete this meeting.");
+    const call = await latestCall(ctx, meeting.id);
+    if (call && call.endedAt === undefined && (await callState(ctx, call, Date.now())).open) fail("FAILED_PRECONDITION", "End the call before deleting the meeting.");
+    return { deleted: await purgeMeeting(ctx, meeting) };
+  },
+});
+
+/** Everything the meeting kept, for its host: to hand over, archive or satisfy a request for data. */
+export const exportAll = app.query({
+  access: "meetings.read",
+  args: { code: s.string({ maxLength: 64 }) },
+  handler: async (ctx, { code }) => {
+    const meeting = await meetingFor(ctx, code);
+    const me = ctx.auth.requirePrincipal();
+    if (meeting.hostId !== me.id) fail("FORBIDDEN", "Only the host can export this meeting.");
+    const rows = async (collection: any) => (await ctx.db.find(collection, { meetingId: meeting.id })).map(strip);
+    return {
+      exportedAt: Date.now(),
+      meeting: strip(meeting),
+      calls: (await rows(calls)).sort((a: any, b: any) => a.number - b.number),
+      attendance: (await rows(peers)).map(({ meetingId, ...p }: any) => p),
+      entries: (await ctx.db.find(entries, { meetingId: meeting.id }, { orderBy: [{ field: "seq", direction: "asc" }] })).map(stripEntry),
+      summaries: await rows(summaries),
+      decisions: await rows(decisions),
+      actionItems: await rows(actionItems),
     };
   },
 });

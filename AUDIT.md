@@ -1,5 +1,7 @@
 # Meetings: completeness, reliability and platform audit
 
+> **Update 2026-11-23.** This audit is of FeltKit 0.3.32 as of 2026-11-18. Since then: agents need host approval, and meetings keep action items, decisions and summaries; they can be searched, exported and deleted, recorded on the host's device, and branded. Rows below that say "Recording ❌", "No AI summary", "No delete" or "agents join by link" are superseded; see docs/STARTER.md.
+
 Audit of this repository (FeltKit 0.3.32) against [convex-meetings](https://github.com/saranatour1/convex-meetings)
 (Convex + TanStack Start + Cloudflare RealtimeKit), 2026-11-18. Every claim below cites a test, a
 script run, or a file. "Verified" means an automated check in this repository exercised it; anything

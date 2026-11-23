@@ -108,6 +108,12 @@ try {
     await ada.waitForURL(/\/m\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/);
     code = ada.url().split("/m/")[1];
     await ada.getByRole("button", { name: "Start the call" }).click();
+    // Agents attend only with the host's approval; this run's agent has none, so the host opens the meeting to agents.
+    await ada.getByRole("tab", { name: /^People/ }).click();
+    await ada.getByLabel("Agents").selectOption("open");
+    await ada.getByRole("button", { name: "Save access" }).click();
+    await ada.getByRole("button", { name: "Saved" }).waitFor();
+    await ada.getByRole("tab", { name: "Chat" }).click();
     await joinCall(grace, code);
     await connected(ada, "grace");
     await connected(grace, "ada");

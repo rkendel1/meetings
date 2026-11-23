@@ -1,7 +1,7 @@
 import { fail, s } from "@feltdb/feltkit";
 import { app, calls } from "./app.js";
 import { peers } from "./_presence.js";
-import { append, endPeer, isLive, kindOf, latestCall, meetingFor, nameOf, ownPeer, sessionRefOf, settle, type Meeting, type Peer } from "./_meeting.js";
+import { append, endPeer, finishCall, isLive, kindOf, latestCall, meetingFor, nameOf, ownPeer, sessionRefOf, settle, type Meeting, type Peer } from "./_meeting.js";
 import { meetings } from "./app.js";
 
 const Joined = s.object({ peerId: s.string(), callId: s.string(), callNumber: s.integer(), started: s.boolean() });
@@ -38,8 +38,8 @@ export const join = app.mutation({
       if (kind === "agent") fail("FAILED_PRECONDITION", "No call is running in this meeting. Agents attend calls people have started; check meetings.get.");
       const previous = await latestCall(ctx, meeting.id);
       const number = (previous?.number ?? 0) + 1;
-      const id = await ctx.db.insert(calls, { meetingId: meeting.id, number, startedAt: now });
-      call = { id, meetingId: meeting.id, number, startedAt: now };
+      const id = await ctx.db.insert(calls, { meetingId: meeting.id, number, startedAt: now, open: true });
+      call = { id, meetingId: meeting.id, number, startedAt: now, open: true };
       started = true;
     }
     // The name everyone sees, and that captions and the recap are attributed to, is the principal's own:
@@ -124,7 +124,7 @@ export const end = app.mutation({
       await settle(ctx, meeting, now);
     } else {
       for (const p of all) await endPeer(ctx, p, now, "ended");
-      await ctx.db.patch(calls, call.id, { endedAt: now });
+      await finishCall(ctx, call, now);
       await append(ctx, meeting, { callId: call.id, kind: "system", text: "The host ended the call" });
     }
     return { ok: true };

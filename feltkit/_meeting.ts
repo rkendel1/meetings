@@ -2,15 +2,15 @@
 import { fail } from "@feltdb/feltkit";
 import { calls, entries, meetings } from "./app.js";
 import { peers } from "./_presence.js";
-import { GRACE_MS, LIVE_MS, callState, endPeer, isLive, settle, type CallState } from "./_presence.js";
-export { GRACE_MS, LIVE_MS, callState, endPeer, isLive, settle, type CallState };
+import { GRACE_MS, LIVE_MS, callState, endPeer, finishCall, isLive, settle, type CallState } from "./_presence.js";
+export { GRACE_MS, LIVE_MS, callState, endPeer, finishCall, isLive, settle, type CallState };
 
 export const REACTIONS = ["👍", "👏", "😂", "🎉", "❤️", "🤔"] as const;
 
 type Principal = { id: string; type: string; displayName?: string };
 export type LeftReason = "left" | "replaced" | "expired" | "removed" | "ended" | "session-ended";
-export type Meeting = { id: string; code: string; title: string; hostId: string; hostName: string; access: "link" | "invited"; invited: string[]; scheduledFor?: number; createdAt: number };
-export type Call = { id: string; meetingId: string; number: number; startedAt: number; endedAt?: number };
+export type Meeting = { id: string; code: string; title: string; hostId: string; hostName: string; access: "link" | "invited"; invited: string[]; agents?: "approved" | "open"; scheduledFor?: number; createdAt: number };
+export type Call = { id: string; meetingId: string; number: number; startedAt: number; endedAt?: number; open?: boolean; recording?: { by: string; byName: string; startedAt: number; stoppedAt?: number } };
 export type Peer = { id: string; meetingId: string; callId: string; principalId: string; name: string; kind: "person" | "agent"; joinedAt: number; lastSeenAt: number; leftAt?: number; leftReason?: LeftReason; sessionRef?: string; signalWindowAt?: number; signalCount?: number; mic: boolean; cam: boolean; screen: boolean; hand: boolean };
 
 const LETTERS = "abcdefghijkmnopqrstuvwxyz";
@@ -31,11 +31,16 @@ export function nameOf(p: Principal): string {
   return (p.displayName?.trim() || p.id).slice(0, 80);
 }
 
-export function mayAttend(meeting: Meeting, principalId: string): boolean {
-  return meeting.access === "link" || meeting.hostId === principalId || meeting.invited.includes(principalId);
+/**
+ * Who may attend: the host and the listed principals, and (for a link meeting) any signed-in person. An agent
+ * holding only the link attends only if the host opened the meeting to agents; otherwise the host lists it.
+ */
+export function mayAttend(meeting: Meeting, principalId: string, kind: "person" | "agent" = "person"): boolean {
+  if (meeting.hostId === principalId || meeting.invited.includes(principalId)) return true;
+  return meeting.access === "link" && (kind === "person" || meeting.agents === "open");
 }
 
-async function byCode(ctx: any, code: string): Promise<Meeting | null> {
+export async function byCode(ctx: any, code: string): Promise<Meeting | null> {
   const [meeting] = (await ctx.db.find(meetings, { code: code.trim().toLowerCase() }, { limit: 1 })) as Meeting[];
   return meeting ?? null;
 }
@@ -44,7 +49,7 @@ async function byCode(ctx: any, code: string): Promise<Meeting | null> {
 export async function meetingFor(ctx: any, code: string): Promise<Meeting> {
   const me = ctx.auth.requirePrincipal() as Principal;
   const meeting = await byCode(ctx, code);
-  if (!meeting || !mayAttend(meeting, me.id)) fail("NOT_FOUND", "No meeting with that code, or you are not invited to it.");
+  if (!meeting || !mayAttend(meeting, me.id, kindOf(me))) fail("NOT_FOUND", "No meeting with that code, or you are not invited to it.");
   return meeting;
 }
 
@@ -77,7 +82,7 @@ export async function ownPeer(ctx: any, peerId: string): Promise<Peer> {
   // (another tab after sign-in, a replayed request) cannot revive or extend it.
   if (peer.sessionRef && peer.sessionRef !== sessionRefOf(ctx)) fail("FAILED_PRECONDITION", "This connection belongs to another session. Join again.", { reason: "session" });
   const meeting = (await ctx.db.get(meetings, peer.meetingId)) as Meeting | null;
-  if (!meeting || !mayAttend(meeting, me.id)) fail("FAILED_PRECONDITION", GONE.removed, { reason: "removed" });
+  if (!meeting || !mayAttend(meeting, me.id, kindOf(me))) fail("FAILED_PRECONDITION", GONE.removed, { reason: "removed" });
   if (peer.leftAt !== undefined) fail("FAILED_PRECONDITION", GONE[peer.leftReason ?? "left"], { reason: peer.leftReason ?? "left" });
   if (!isLive(peer, Date.now())) fail("FAILED_PRECONDITION", GONE.expired, { reason: "expired" });
   return peer;

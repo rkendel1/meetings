@@ -19,9 +19,10 @@ export async function retrying<T>(run: () => Promise<T>, attempts = 4): Promise<
   }
 }
 
-export type Route = { page: "home" } | { page: "call"; code: string } | { page: "recap"; code: string; call?: number };
+export type Route = { page: "home" } | { page: "settings" } | { page: "call"; code: string } | { page: "recap"; code: string; call?: number };
 
 function parse(path: string): Route {
+  if (path.replace(/\/$/, "") === "/settings") return { page: "settings" };
   const m = path.match(/^\/m\/([a-z]{3}-[a-z]{4}-[a-z]{3})(?:\/recap(?:\/(\d+))?)?\/?$/);
   if (!m) return { page: "home" };
   if (path.includes("/recap")) return { page: "recap", code: m[1]!, ...(m[2] ? { call: Number(m[2]) } : {}) };
@@ -29,6 +30,7 @@ function parse(path: string): Route {
 }
 
 export function href(route: Route): string {
+  if (route.page === "settings") return "/settings";
   if (route.page === "call") return `/m/${route.code}`;
   if (route.page === "recap") return `/m/${route.code}/recap${route.call ? `/${route.call}` : ""}`;
   return "/";

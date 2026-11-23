@@ -5,6 +5,8 @@ import { ResetForm, SignedOut } from "./auth";
 import { Home } from "./Home";
 import { Call } from "./Call";
 import { Recap } from "./Recap";
+import { Settings } from "./Settings";
+import { BrandMark, useApplyBrand, useBrand } from "./brand";
 import { describe, navigate, useRoute } from "./util";
 
 type Notice = { tone: "error" | "info"; text: string } | null;
@@ -15,6 +17,9 @@ export function App() {
   const route = useRoute();
   const [notice, setNotice] = useState<Notice>(null);
   const principal = session?.principal ?? null;
+  const brand = useBrand();
+  useApplyBrand(brand);
+  const isAdmin = Boolean(session?.permissions?.includes("settings.write"));
 
   // In development, sign in as the first dev user so the app works on first load.
   const tried = useRef(false);
@@ -50,10 +55,7 @@ export function App() {
       {!inCall && (
         <header className="topbar">
           <a className="brand" href="/" onClick={(e) => (e.preventDefault(), navigate({ page: "home" }))}>
-            <span className="logo" aria-hidden>
-              <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M4 6.5A2.5 2.5 0 0 1 6.5 4h7A2.5 2.5 0 0 1 16 6.5v1.8l3.2-2.1A1.2 1.2 0 0 1 21 7.2v9.6a1.2 1.2 0 0 1-1.8 1L16 15.7v1.8a2.5 2.5 0 0 1-2.5 2.5h-7A2.5 2.5 0 0 1 4 17.5z" /></svg>
-            </span>
-            <span className="brand-name">Meetings</span>
+            <BrandMark brand={brand} />
             {session && !session.environment.production && <span className="env">{session.environment.name}</span>}
           </a>
           <div className="topbar-right">
@@ -74,6 +76,7 @@ export function App() {
             {principal && !session?.devUsers.length && (
               <button className="secondary small" onClick={() => void signOut().catch(report)} title={principal.displayName ?? principal.id}>Sign out</button>
             )}
+            {isAdmin && <a className="dashboard-link" href="/settings" onClick={(e) => (e.preventDefault(), navigate({ page: "settings" }))}>Settings</a>}
             <ThemeToggle />
             {session?.dashboard && <a className="dashboard-link" href={session.dashboard} target="_blank" rel="noreferrer">Studio ↗</a>}
           </div>
@@ -92,11 +95,13 @@ export function App() {
       ) : resetToken ? (
         <div className="center"><div className="card narrow"><ResetForm token={resetToken} onDone={() => (setResetToken(null), setNotice({ tone: "info", text: "Your password is set." }))} /></div></div>
       ) : !principal ? (
-        <SignedOut devUsers={session.devUsers} accounts={session.accounts ?? null} onDevSignIn={(id) => signInAsDevUser(id).catch(report)} onSignIn={signIn} onSignUp={signUp} />
+        <SignedOut brand={brand} devUsers={session.devUsers} accounts={session.accounts ?? null} onDevSignIn={(id) => signInAsDevUser(id).catch(report)} onSignIn={signIn} onSignUp={signUp} />
       ) : route.page === "call" ? (
         <Call key={`${route.code}:${principal.id}`} code={route.code} me={{ id: principal.id, name: principal.displayName ?? principal.id }} onError={report} />
+      ) : route.page === "settings" ? (
+        isAdmin ? <Settings onError={report} /> : <div className="center muted">Settings are for administrators.</div>
       ) : route.page === "recap" ? (
-        <Recap code={route.code} callNumber={route.call} />
+        <Recap code={route.code} callNumber={route.call} me={principal.id} />
       ) : (
         <Home me={{ id: principal.id, name: principal.displayName ?? principal.id }} onError={report} />
       )}

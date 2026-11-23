@@ -1,13 +1,14 @@
 # meetings
 
-> Status: a working MVP, not production-ready. Phase 3.1 closure: [PHASE-3.1-CLOSURE.md](PHASE-3.1-CLOSURE.md)
-> (disposition, evidence, what is safe to claim) and [PHASE-3.1-GAPS.md](PHASE-3.1-GAPS.md); earlier audit in
-> [AUDIT.md](AUDIT.md); network lab in [docs/NETLAB.md](docs/NETLAB.md).
+> Status: a working starter, not production-ready. **Starting from this repository?** Read
+> [docs/STARTER.md](docs/STARTER.md): how to brand it, point it at a model, admit agents and schedule the sweep; what
+> FeltKit provides and how many lines of application code each capability took; what is and is not verified.
+> Upstream asks: [docs/UPSTREAM-ASKS.md](docs/UPSTREAM-ASKS.md). Earlier evidence: [PHASE-3.1-CLOSURE.md](PHASE-3.1-CLOSURE.md),
+> [PHASE-3.1-GAPS.md](PHASE-3.1-GAPS.md), [AUDIT.md](AUDIT.md), [docs/NETLAB.md](docs/NETLAB.md).
 >
-> **Platform dependency.** Session-bound presence (a participant whose session ends elsewhere leaves everyone's
-> call within a second) and MCP replay safety need FeltKit changes that are on `rkendel1/feltkit` but **not
-> published**. On published `@feltdb/feltkit` 0.3.32 the app works, but those two guarantees do not hold
-> (presence then ends by expiry, ~45–60 s) and `tests/session-bound.test.ts` fails by design.
+> **Requires `@feltdb/feltkit` 0.3.37 or later.** Session-bound presence and MCP replay safety, which Phase 3.1
+> recorded as unpublished, are in 0.3.37 (the backend suite that failed on 0.3.32 passes). TURN/STUN is not
+> installed, by decision: calls across strict NATs will not connect.
 
 Video meetings in the browser that **people and agents attend together**, built with
 [FeltKit](https://www.npmjs.com/package/@feltdb/feltkit) (`npm create feltkit@latest meetings`).
@@ -34,6 +35,12 @@ first-class participant with its own identity and permissions, not a browser gue
   `chat_send`, `chat_react`, `notes_add` (summary/action items into the recap), `meetings_recap`,
   `meetings_leave`. Agents carry no media; they read what was said as text, and must be visibly in a
   running call to read or post in it.
+
+- **A record of every meeting**: action items (owner, due date, status; the owner is notified and reminded),
+  decisions and versioned summaries, written by people, by agents over MCP, by a **scribe** agent when the call
+  ends, and by the **model** on request. **Search** past meetings; **Ask AI** in the call; **record** a call
+  (host's browser, with a notice to everyone); **export** or **delete** a meeting; **retention** policy;
+  **branding** (name, colour, logo, tagline) from Settings. Agents attend only with the host's approval.
 
 ## Run it
 
@@ -132,8 +139,9 @@ expects one known platform gap: MCP drops idempotency keys (AUDIT.md, G1).
 
 ## Not built (compared with convex-meetings)
 
-Organizations and custom roles, e-mail invites with `.ics`, Google/GitHub sign-in and passkeys,
-recording to object storage, a waiting room / join requests, ringing, public drop-in rooms with AI
+Organizations and custom roles, guests without accounts, per-workspace branding, e-mail invites with `.ics`,
+Google/GitHub sign-in and passkeys, recording to object storage or on a server (the host's browser saves a file
+today), server-side transcription (captions come from each person's browser), a waiting room / join requests, ringing, public drop-in rooms with AI
 moderation, shared-screen annotations and whiteboard, usage caps. Media is a mesh, which suits small
 calls (each person uploads to every other); larger calls need an SFU (the change is confined to
 `src/rtc.ts` and `feltkit/signals.ts`). Peers behind strict NATs need a TURN server.

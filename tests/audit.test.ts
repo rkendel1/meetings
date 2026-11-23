@@ -21,7 +21,7 @@ function clock(start = realNow()) {
 test("a non-attendee cannot silently read a live call's chat and captions", async () => {
   const t = await createTestApp();
   try {
-    const m = await t.as("ada").mutation(api.meetings.create, { title: "Link meeting" });
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "Link meeting", agents: "open" });
     const a = await t.as("ada").mutation(api.calls.join, { code: m.code });
     await t.as("ada").mutation(api.chat.caption, { peerId: a.peerId, code: m.code, text: "secret plan" });
     // Alan has the link but is not in the call: he must join (and be seen) to follow it.
@@ -56,7 +56,7 @@ test("revoking an invitation removes the person from the live call and stops the
     const state = await t.as("ada").query(api.meetings.get, { code: m.code });
     assert.deepEqual(state.peers.map((p: any) => p.principalId), ["ada"]);
     // Switching a link meeting to invite-only evicts everyone not invited, agents included.
-    const m2 = await t.as("ada").mutation(api.meetings.create, { title: "Open" });
+    const m2 = await t.as("ada").mutation(api.meetings.create, { title: "Open", agents: "open" });
     await t.as("ada").mutation(api.calls.join, { code: m2.code });
     await t.as("alan").mutation(api.calls.join, { code: m2.code });
     await t.as(claude).mutation(api.calls.join, { code: m2.code });
@@ -71,7 +71,7 @@ test("revoking an invitation removes the person from the live call and stops the
 test("a non-person principal with the agent role is treated as an agent, never as a person", async () => {
   const t = await createTestApp();
   try {
-    const m = await t.as("ada").mutation(api.meetings.create, { title: "Keys" });
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "Keys", agents: "open" });
     // An API-key or service principal cannot start a call, create meetings, or count as a person.
     await assert.rejects(t.as(keyAgent).mutation(api.calls.join, { code: m.code }), /No call is running/);
     await assert.rejects(t.as(keyAgent).mutation(api.meetings.create, { title: "x" }), (e) => code(e) === "FORBIDDEN");
@@ -87,7 +87,7 @@ test("a non-person principal with the agent role is treated as an agent, never a
 test("agents are refused every person-only and host-only operation, on the server", async () => {
   const t = await createTestApp();
   try {
-    const m = await t.as("ada").mutation(api.meetings.create, { title: "Guarded" });
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "Guarded", agents: "open" });
     const a = await t.as("ada").mutation(api.calls.join, { code: m.code });
     const c = await t.as(claude).mutation(api.calls.join, { code: m.code });
     const refused: Array<[string, () => Promise<unknown>]> = [
@@ -134,7 +134,7 @@ test("names are not trusted for identity: words are attributed to the principal,
 test("concurrent first joins land in one call; concurrent agent joins keep one presence", async () => {
   const t = await createTestApp();
   try {
-    const m = await t.as("ada").mutation(api.meetings.create, { title: "Race" });
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "Race", agents: "open" });
     const retry = async <T>(run: () => Promise<T>) => {
       for (let i = 0; ; i++) {
         try {
@@ -158,7 +158,7 @@ test("concurrent first joins land in one call; concurrent agent joins keep one p
 test("concurrent chat from many writers keeps one gap-free order", async () => {
   const t = await createTestApp();
   try {
-    const m = await t.as("ada").mutation(api.meetings.create, { title: "Busy" });
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "Busy", agents: "open" });
     await t.as("ada").mutation(api.calls.join, { code: m.code });
     await t.as("grace").mutation(api.calls.join, { code: m.code });
     await t.as(claude).mutation(api.calls.join, { code: m.code });
@@ -179,7 +179,7 @@ test("presence: a crashed connection expires; the call survives a refresh and en
   const c = clock();
   const t = await createTestApp();
   try {
-    const m = await t.as("ada").mutation(api.meetings.create, { title: "Lifecycle" });
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "Lifecycle", agents: "open" });
     const a1 = await t.as("ada").mutation(api.calls.join, { code: m.code });
     const g = await t.as("grace").mutation(api.calls.join, { code: m.code });
     await t.as(claude).mutation(api.calls.join, { code: m.code });
@@ -261,7 +261,7 @@ test("an explicit leave by the last person ends the call at once; a joiner durin
 test("raised hands and media flags are published per connection; agents cannot claim media", async () => {
   const t = await createTestApp();
   try {
-    const m = await t.as("ada").mutation(api.meetings.create, { title: "Hands" });
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "Hands", agents: "open" });
     const a = await t.as("ada").mutation(api.calls.join, { code: m.code, mic: true, cam: true });
     const c = await t.as(claude).mutation(api.calls.join, { code: m.code, mic: true, cam: true });
     await t.as("ada").mutation(api.calls.heartbeat, { peerId: a.peerId, hand: true, cam: false, screen: true });

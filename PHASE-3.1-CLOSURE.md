@@ -1,5 +1,12 @@
 # Phase 3.1 closure: platform closure, evidence and release acceptance
 
+> **Update 2026-11-23.** The blocker below is lifted: `@feltdb/feltkit` 0.3.37 publishes session-bound presence
+> (`ctx.auth.session`, `auth.onSessionEnd`), MCP `_meta` idempotency and the measure detectors. On 0.3.37 the backend
+> suite is 29/29 for the code as it was (40/40 now), `measure --check` passes and the typecheck is clean. The browser
+> suites (E2E, termination, expiry) and the network lab were **not** re-run on 0.3.37; the disposition below is the
+> 2026-11-18 one and stays unverified for those. See docs/STARTER.md.
+
+
 Date: 2026-11-18/19. Gap-by-gap states: [PHASE-3.1-GAPS.md](PHASE-3.1-GAPS.md). Network lab:
 [docs/NETLAB.md](docs/NETLAB.md). Raw acceptance output: [docs/acceptance/](docs/acceptance/).
 

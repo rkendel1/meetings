@@ -2,6 +2,7 @@
 import { s } from "@feltdb/feltkit";
 import { calls, entries, meetings } from "./app.js";
 import { peers } from "./_presence.js";
+import { actionItems, decisions, summaries } from "./_records.js";
 
 export const MeetingOut = s.doc(meetings).omit("__version");
 export const CallOut = s.doc(calls).omit("__version");
@@ -17,3 +18,7 @@ export function stripPeer<T extends object>(r: T): Omit<T, "meetingId"> {
   return rest as Omit<T, "meetingId">;
 }
 export const stripEntry = stripPeer;
+
+export const ActionOut = s.doc(actionItems).omit("__version");
+export const DecisionOut = s.doc(decisions).omit("__version");
+export const SummaryOut = s.doc(summaries).omit("__version");

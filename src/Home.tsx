@@ -1,13 +1,33 @@
 import { useState, type FormEvent } from "react";
-import { useMutation, useQueryState } from "@feltdb/feltkit/react";
+import { useFeltKit, useMutation, useQueryState } from "@feltdb/feltkit/react";
 import { api } from "../feltkit/_generated/api";
+import { useBrand } from "./brand";
 import { codeFrom, describe, navigate, when } from "./util";
 
 export function Home({ me, onError }: { me: { id: string; name: string }; onError: (e: unknown) => void }) {
+  const brand = useBrand();
   const meetings = useQueryState(api.meetings.list);
+  const mine = useQueryState(api.actions.list, { mine: true, status: "open" });
+  const updateItem = useMutation(api.actions.update);
+  const client = useFeltKit();
+  const [find, setFind] = useState("");
+  const [hits, setHits] = useState<Awaited<ReturnType<typeof search>> | null>(null);
+  async function search(query: string) {
+    return client.query(api.search.find, { query });
+  }
+  const runSearch = async (e: FormEvent) => {
+    e.preventDefault();
+    if (find.trim().length < 2) return setHits(null);
+    try {
+      setHits(await search(find.trim()));
+    } catch (error) {
+      onError(error);
+    }
+  };
   const create = useMutation(api.meetings.create);
   const [title, setTitle] = useState("");
   const [access, setAccess] = useState<"link" | "invited">("link");
+  const [agents, setAgents] = useState<"approved" | "open">("approved");
   const [invited, setInvited] = useState("");
   const [scheduled, setScheduled] = useState("");
   const [join, setJoin] = useState("");
@@ -20,6 +40,7 @@ export function Home({ me, onError }: { me: { id: string; name: string }; onErro
       const m = await create({
         title: title.trim() || (now ? `${me.name.split(" ")[0]}'s meeting` : "Meeting"),
         access,
+        agents,
         invited: invited.split(/[\s,]+/).filter(Boolean),
         ...(!now && scheduled ? { scheduledFor: new Date(scheduled).getTime() } : {}),
       });
@@ -38,8 +59,8 @@ export function Home({ me, onError }: { me: { id: string; name: string }; onErro
   return (
     <main className="home">
       <section className="hero">
-        <h1>Meet with your team, and with your agents.</h1>
-        <p className="muted">Video, screen share, chat and live captions in the browser. Agents attend through MCP: they follow what is said, chat, and leave notes in the recap.</p>
+        <h1>{brand.tagline ?? "Meet with your team, and with your agents."}</h1>
+        <p className="muted">Video, screen share, chat and live captions in the browser. Agents attend through MCP: they follow what is said, keep the decisions and action items, and research earlier meetings.</p>
         <div className="hero-actions">
           <button className="primary big" disabled={busy} onClick={() => void start(true)}>Start a meeting now</button>
           <form className="join-form" onSubmit={(e) => (e.preventDefault(), joinCode && navigate({ page: "call", code: joinCode }))}>
@@ -49,6 +70,38 @@ export function Home({ me, onError }: { me: { id: string; name: string }; onErro
         </div>
       </section>
 
+      <section className="card">
+        <h2>Search past meetings</h2>
+        <form className="join-form" onSubmit={(e) => void runSearch(e)}>
+          <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="What did we decide about pricing?" aria-label="Search past meetings" />
+          <button className="secondary" disabled={find.trim().length < 2}>Search</button>
+        </form>
+        {hits && (hits.hits.length === 0 ? <p className="muted small-text">Nothing found in {hits.meetingsSearched} meetings.</p> : (
+          <ul className="plain hits">
+            {hits.hits.map((h, i) => (
+              <li key={i}>
+                <a href={`/m/${h.code}/recap${h.callNumber ? `/${h.callNumber}` : ""}`} onClick={(e) => (e.preventDefault(), navigate({ page: "recap", code: h.code, ...(h.callNumber ? { call: h.callNumber } : {}) }))}><b>{h.title}</b></a>
+                <span className="badge">{h.kind}</span> <span className="muted small-text">{when(h.at)}{h.who ? ` · ${h.who}` : ""}</span>
+                <div>{h.text}</div>
+              </li>
+            ))}
+            {hits.truncated && <li className="muted small-text">Only recent lines of busy meetings were searched.</li>}
+          </ul>
+        ))}
+      </section>
+
+      {(mine.data ?? []).length > 0 && (
+        <section className="card">
+          <h2>Assigned to you</h2>
+          {(mine.data ?? []).map((i) => (
+            <label key={i.id} className="note action open">
+              <input type="checkbox" checked={false} onChange={() => void updateItem({ id: i.id, status: "done" }).catch(onError)} />
+              <span><span className="message-text">{i.text}</span><span className="muted small-text">{i.dueAt ? ` · due ${when(i.dueAt)}` : ""}</span></span>
+            </label>
+          ))}
+        </section>
+      )}
+
       <div className="home-grid">
         <section className="card">
           <h2>New meeting</h2>
@@ -57,8 +110,15 @@ export function Home({ me, onError }: { me: { id: string; name: string }; onErro
             <label className="field">
               <span>Who can join</span>
               <select value={access} onChange={(e) => setAccess(e.target.value as "link" | "invited")}>
-                <option value="link">Anyone signed in with the link (people and agents)</option>
+                <option value="link">Anyone signed in with the link</option>
                 <option value="invited">Only people and agents I invite</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Which agents may attend</span>
+              <select value={agents} onChange={(e) => setAgents(e.target.value as "approved" | "open")}>
+                <option value="approved">Only the agents I invite</option>
+                <option value="open">Any agent that has the link</option>
               </select>
             </label>
             <label className="field">

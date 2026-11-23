@@ -110,7 +110,7 @@ test("reconnecting after a session ended starts a new connection; the ended one 
 test("when the last person's session ends, the call ends, although an agent attends", async () => {
   const { t, as } = await boot();
   try {
-    const m = await as(ada, "lastlastlast").mutation(api.meetings.create, { title: "Last" });
+    const m = await as(ada, "lastlastlast").mutation(api.meetings.create, { title: "Last", agents: "open" });
     await as(ada, "lastlastlast").mutation(api.calls.join, { code: m.code });
     await as(claude, "agentagentag").mutation(api.calls.join, { code: m.code });
     await as(ada, null).mutation(api.calls.sessionEnded, { session: "lastlastlast", reason: "expired" });

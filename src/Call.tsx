@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useFeltKit, useMutation, useQueryState } from "@feltdb/feltkit/react";
 import { api } from "../feltkit/_generated/api";
+import { startRecorder, saveBlob, type Recorder } from "./recorder";
 import { Mesh } from "./rtc";
 import { clock, describe, navigate, retrying } from "./util";
 
 type Me = { id: string; name: string };
 type Peer = { id: string; callId: string; principalId: string; name: string; kind: "person" | "agent"; joinedAt: number; lastSeenAt: number; leftAt?: number; mic: boolean; cam: boolean; screen: boolean; hand: boolean };
 type Entry = { id: string; seq: number; kind: "chat" | "caption" | "reaction" | "note" | "system"; authorId: string; authorName: string; authorKind: "person" | "agent"; text: string; createdAt: number };
+type Recording = { by: string; byName: string; startedAt: number; stoppedAt?: number };
 type Joined = { peerId: string; callId: string; callNumber: number };
 
 const REACTIONS = ["👍", "👏", "😂", "🎉", "❤️", "🤔"] as const;
@@ -83,6 +85,7 @@ export function Call({ code, me, onError }: { code: string; me: Me; onError: (e:
       joined={joined}
       peers={state.data.peers as Peer[]}
       callOpen={state.data.call?.id === joined.callId}
+      recording={state.data.call?.id === joined.callId ? state.data.call?.recording : undefined}
       lostAccess={Boolean(state.error)}
       initial={media}
       onLeft={(why, final) => (final && forget(code), setLeft(why))}
@@ -217,7 +220,7 @@ function Lobby(props: { code: string; me: Me; title: string; peers: Peer[]; medi
 
 type SpeechRecognitionLike = { continuous: boolean; interimResults: boolean; lang: string; start(): void; stop(): void; onresult: ((e: any) => void) | null; onend: (() => void) | null; onerror: ((e: any) => void) | null };
 
-function Room(props: { code: string; me: Me; meeting: { title: string; code: string; hostId: string; access: string; invited: string[] }; isHost: boolean; joined: Joined; peers: Peer[]; callOpen: boolean; lostAccess: boolean; initial: { stream: MediaStream | null; mic: boolean; cam: boolean }; onLeft: (why: string, final: boolean) => void; onReconnect: (kept: { stream: MediaStream; mic: boolean; cam: boolean }) => void; onError: (e: unknown) => void }) {
+function Room(props: { code: string; me: Me; meeting: { title: string; code: string; hostId: string; access: string; invited: string[]; agents?: string }; isHost: boolean; joined: Joined; peers: Peer[]; callOpen: boolean; recording?: Recording | undefined; lostAccess: boolean; initial: { stream: MediaStream | null; mic: boolean; cam: boolean }; onLeft: (why: string, final: boolean) => void; onReconnect: (kept: { stream: MediaStream; mic: boolean; cam: boolean }) => void; onError: (e: unknown) => void }) {
   const { code, joined, peers } = props;
   const heartbeat = useMutation(api.calls.heartbeat);
   const leave = useMutation(api.calls.leave);
@@ -225,6 +228,8 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
   const sendSignal = useMutation(api.signals.send);
   const ack = useMutation(api.signals.ack);
   const caption = useMutation(api.chat.caption);
+  const recStart = useMutation(api.recording.start);
+  const recStop = useMutation(api.recording.stop);
   const inbox = useQueryState(api.signals.inbox, { peerId: joined.peerId });
   const feed = useQueryState(api.meetings.feed, { code, callNumber: joined.callNumber, limit: 500 });
 
@@ -232,13 +237,42 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
   const [cam, setCam] = useState(props.initial.cam && Boolean(props.initial.stream));
   const [screen, setScreen] = useState<MediaStream | null>(null);
   const [hand, setHand] = useState(false);
-  const [panel, setPanel] = useState<"chat" | "captions" | "people" | "agents" | null>("chat");
+  const [panel, setPanel] = useState<"chat" | "records" | "captions" | "people" | "agents" | null>("chat");
   const [captionsOn, setCaptionsOn] = useState(false);
   const [interim, setInterim] = useState("");
   const [, setTick] = useState(0);
   const local = useRef<MediaStream>(props.initial.stream ?? new MediaStream());
   const mesh = useRef<Mesh | null>(null);
   const done = useRef(false);
+  const recorder = useRef<Recorder | null>(null);
+  const recordingOn = props.recording && props.recording.stoppedAt === undefined ? props.recording : null;
+
+  /** Stop recording here and save the file on this device. */
+  async function saveRecording() {
+    const r = recorder.current;
+    recorder.current = null;
+    const blob = await r?.stop();
+    if (blob) saveBlob(blob, `${props.meeting.title.replace(/[^\w-]+/g, "-")}-call${joined.callNumber}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "")}.webm`);
+  }
+  const toggleRecording = async () => {
+    try {
+      if (recorder.current) {
+        await saveRecording();
+        await recStop({ code });
+        return;
+      }
+      if (!confirm("Record this call? Everyone in it is told, and the file is saved on this device.")) return;
+      await retrying(() => recStart({ code }));
+      const videos = () => [...document.querySelectorAll<HTMLVideoElement>(".stage-area .tile video")];
+      recorder.current = startRecorder(local.current, () => [...remotes.values()].map((r) => r.stream).filter(Boolean) as MediaStream[], videos);
+      if (!recorder.current) {
+        await recStop({ code });
+        props.onError(new Error("This browser cannot record."));
+      }
+    } catch (error) {
+      props.onError(error);
+    }
+  };
 
   // Media mesh for this connection, with ICE servers issued for it (TURN credentials when configured).
   const client = useFeltKit();
@@ -320,6 +354,7 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
   }, [props.callOpen, Boolean(mine)]);
 
   function stopAll() {
+    if (recorder.current) void saveRecording().then(() => recStop({ code })).catch(() => {});
     local.current.getTracks().forEach((t) => t.stop());
     screen?.getTracks().forEach((t) => t.stop());
     mesh.current?.close();
@@ -508,6 +543,7 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
           <strong>{props.meeting.title}</strong>
           <span className="muted small-text"><code>{code}</code> · call {joined.callNumber} · {people.length} {people.length === 1 ? "person" : "people"}{agents.length ? `, ${agents.length} agent${agents.length === 1 ? "" : "s"}` : ""}</span>
         </div>
+        {recordingOn && <span className="badge recording-badge" role="status">● Recording · started by {recordingOn.byName}</span>}
         {offline && <span className="badge offline-badge" role="status">Connection lost: reconnecting…</span>}
         <button className="secondary small" onClick={() => void navigator.clipboard?.writeText(location.href)}>Copy link</button>
       </div>
@@ -539,14 +575,15 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
         {panel && (
           <aside className="panel">
             <div className="tabs" role="tablist">
-              {(["chat", "captions", "people", "agents"] as const).map((t) => (
+              {(["chat", "records", "captions", "people", "agents"] as const).map((t) => (
                 <button key={t} role="tab" aria-selected={panel === t} className={panel === t ? "on" : ""} onClick={() => setPanel(t)}>
-                  {t === "chat" ? "Chat" : t === "captions" ? "Transcript" : t === "people" ? `People (${peers.length})` : "Agents"}
+                  {t === "chat" ? "Chat" : t === "records" ? "Records" : t === "captions" ? "Transcript" : t === "people" ? `People (${peers.length})` : "Agents"}
                 </button>
               ))}
               <button className="ghost" aria-label="Close panel" onClick={() => setPanel(null)}>×</button>
             </div>
             {panel === "chat" && <ChatPanel code={code} entries={entries.filter((e) => e.kind === "chat" || e.kind === "note" || e.kind === "system")} onError={props.onError} />}
+            {panel === "records" && <Records code={code} onError={props.onError} />}
             {panel === "captions" && <Transcript entries={entries.filter((e) => e.kind === "caption")} supported={Boolean(SpeechRecognition)} on={captionsOn} toggle={() => setCaptionsOn(!captionsOn)} />}
             {panel === "people" && (
               <>
@@ -554,7 +591,7 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
                 <People peers={peers} me={joined.peerId} isHost={props.isHost} remotes={remotes} onRemove={(id) => void end({ code, peerId: id }).catch(props.onError)} />
               </>
             )}
-            {panel === "agents" && <AgentsPanel code={code} agents={agents} access={props.meeting.access} />}
+            {panel === "agents" && <AgentsPanel code={code} agents={agents} access={props.meeting.access} policy={props.meeting.agents ?? "approved"} />}
           </aside>
         )}
       </div>
@@ -571,6 +608,7 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
           <button className="round danger" onClick={() => void doLeave()} aria-label="Leave call" title="Leave call"><HangIcon /></button>
         </div>
         <div className="controls-right">
+          {props.isHost && <button className={`secondary small ${recorder.current ? "active" : ""}`} onClick={() => void toggleRecording()} title="Record this call on this device" disabled={Boolean(recordingOn && !recorder.current)}>{recorder.current ? "■ Stop recording" : "● Record"}</button>}
           {props.isHost && <button className="secondary small" onClick={() => void endForAll()}>End for all</button>}
           <button className={`secondary small ${panel ? "active" : ""}`} onClick={() => setPanel(panel ? null : "chat")}>{panel ? "Hide panel" : "Panel"}</button>
         </div>
@@ -610,6 +648,9 @@ function Tile(props: { peer: Peer; self: boolean; stream: MediaStream | null; au
 
 function ChatPanel({ code, entries, onError }: { code: string; entries: Entry[]; onError: (e: unknown) => void }) {
   const send = useMutation(api.chat.send);
+  const client = useFeltKit();
+  const [asking, setAsking] = useState(false);
+  const [history, setHistory] = useState(true);
   const [text, setText] = useState("");
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -625,6 +666,19 @@ function ChatPanel({ code, entries, onError }: { code: string; entries: Entry[];
     } catch (error) {
       setText(t);
       onError(error);
+    }
+  };
+  const ask = async () => {
+    const question = text.trim();
+    if (question.length < 2) return;
+    setAsking(true);
+    try {
+      await client.action(api.ai.ask, { code, question, history });
+      setText("");
+    } catch (error) {
+      onError(error);
+    } finally {
+      setAsking(false);
     }
   };
   return (
@@ -650,7 +704,9 @@ function ChatPanel({ code, entries, onError }: { code: string; entries: Entry[];
       <form className="chat-form" onSubmit={submit}>
         <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Send a message" aria-label="Message" maxLength={4000} />
         <button className="primary small" disabled={!text.trim()}>Send</button>
+        <button type="button" className="secondary small" disabled={asking || text.trim().length < 2} onClick={() => void ask()} title="The assistant answers in the chat, from this call and (if ticked) earlier meetings">{asking ? "Asking…" : "Ask AI"}</button>
       </form>
+      <label className="small-text muted check-line"><input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} /> Also look through earlier meetings</label>
     </div>
   );
 }
@@ -705,15 +761,16 @@ function People({ peers, me, isHost, remotes, onRemove }: { peers: Peer[]; me: s
 }
 
 /** The host changes who may attend. Whoever loses access leaves the call at once (enforced on the server). */
-function AccessEditor({ code, meeting, onError }: { code: string; meeting: { access: string; invited: string[] }; onError: (e: unknown) => void }) {
+function AccessEditor({ code, meeting, onError }: { code: string; meeting: { access: string; invited: string[]; agents?: string }; onError: (e: unknown) => void }) {
   const update = useMutation(api.meetings.update);
   const [access, setAccess] = useState(meeting.access as "link" | "invited");
   const [invited, setInvited] = useState(meeting.invited.join(", "));
+  const [agents, setAgents] = useState((meeting.agents ?? "approved") as "approved" | "open");
   const [saved, setSaved] = useState(false);
   const save = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      await retrying(() => update({ code, access, invited: invited.split(/[\s,]+/).filter(Boolean) }));
+      await retrying(() => update({ code, access, agents, invited: invited.split(/[\s,]+/).filter(Boolean) }));
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (error) {
@@ -728,20 +785,26 @@ function AccessEditor({ code, meeting, onError }: { code: string; meeting: { acc
           <option value="invited">Only invited people and agents</option>
         </select>
       </label>
-      <label className="field"><span>Invited ids</span><input value={invited} onChange={(e) => setInvited(e.target.value)} placeholder="grace, claude" /></label>
+      <label className="field"><span>Agents</span>
+        <select value={agents} onChange={(e) => setAgents(e.target.value as "approved" | "open")}>
+          <option value="approved">Only agents listed below</option>
+          <option value="open">Any agent that has the link</option>
+        </select>
+      </label>
+      <label className="field"><span>Invited ids (people and agents)</span><input value={invited} onChange={(e) => setInvited(e.target.value)} placeholder="grace, claude" /></label>
       <button className="secondary small">{saved ? "Saved" : "Save access"}</button>
     </form>
   );
 }
 
 /** How an agent attends: MCP at this app's /mcp, with an agent session or API key. */
-function AgentsPanel({ code, agents, access }: { code: string; agents: Peer[]; access: string }) {
+function AgentsPanel({ code, agents, access, policy }: { code: string; agents: Peer[]; access: string; policy: string }) {
   const origin = location.origin;
   const steps = useMemo(
     () => [
       { label: "1. Give the agent an identity (in the project folder; prints a token)", cmd: `npx feltkit session create --type agent --id claude --role agent` },
       { label: "2. Connect it over MCP (Claude Code shown; any MCP client works)", cmd: `claude mcp add --transport http meetings ${origin}/mcp --header "Authorization: Bearer <token>"` },
-      { label: "3. Ask it to attend", cmd: `Join meeting ${code} with meetings_join, follow what is said with meetings_feed (pass the returned next as after), answer in chat with chat_send, and add a summary and action items with notes_add when we wrap up. Call meetings_join again every 20 seconds to stay present.` },
+      { label: "3. Ask it to attend", cmd: `Join meeting ${code} with meetings_join, follow what is said with meetings_feed (pass the returned next as after), answer in chat with chat_send, and record decisions with decisions_add and action items with actions_add (assignee, dueAt), and save a summary with summaries_save when we wrap up; use search_find to look up earlier meetings. Call meetings_join again every 20 seconds to stay present.` },
     ],
     [origin, code],
   );
@@ -751,7 +814,7 @@ function AgentsPanel({ code, agents, access }: { code: string; agents: Peer[]; a
         <p className="small-text">
           {agents.length ? `${agents.map((a) => a.name).join(", ")} ${agents.length === 1 ? "is" : "are"} attending.` : "No agents are attending."} Agents join as participants without media: they read the live transcript and chat, post messages, and leave notes for the recap. They never keep a call open on their own.
         </p>
-        {access === "invited" && <p className="small-text warn-text">This meeting is invite-only: the host must invite the agent's id (e.g. <code>claude</code>).</p>}
+        {(access === "invited" || policy === "approved") && <p className="small-text warn-text">The host approves agents: add the agent's id (e.g. <code>claude</code>) to the invited ids in People, or allow any agent with the link.</p>}
         {steps.map((s) => (
           <div key={s.label} className="stack">
             <span className="small-text muted">{s.label}</span>
@@ -759,7 +822,7 @@ function AgentsPanel({ code, agents, access }: { code: string; agents: Peer[]; a
             <button className="secondary small" onClick={() => void navigator.clipboard?.writeText(s.cmd)}>Copy</button>
           </div>
         ))}
-        <p className="small-text muted">In production, issue an API key (Studio → Services → API keys); keys hold the agent role. MCP tools the agent gets: meetings_list, meetings_get, meetings_join, meetings_feed, meetings_recap, meetings_leave, chat_send, chat_react, notes_add.</p>
+        <p className="small-text muted">In production, issue an API key (Studio → Services → API keys); keys hold the agent role. MCP tools the agent gets: meetings_*, chat_send, chat_react, notes_add, actions_add/update/list, decisions_add/list, summaries_save/get, search_find, inbox_list.</p>
       </div>
     </div>
   );
@@ -794,3 +857,51 @@ const CamOffIcon = I("M21 6.5l-4 4V7a1 1 0 0 0-1-1H9.82L21 17.18zM3.27 2 2 3.27 
 const ScreenIcon = I("M20 4H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h5v2h6v-2h5a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 12H4V6h16zM11 8l-4 4h3v3h2v-3h3z");
 const HangIcon = I("M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a1 1 0 0 1 0-1.41C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67a1 1 0 0 1 0 1.41l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.1-.7-.28a11.27 11.27 0 0 0-2.67-1.85 1 1 0 0 1-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z");
 const AgentIcon = I("M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 12 2zM7.5 13a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z");
+
+/** The meeting's decisions and action items, live, with a quick way to add them. Anyone in the meeting may. */
+function Records({ code, onError }: { code: string; onError: (e: unknown) => void }) {
+  const items = useQueryState(api.actions.list, { code });
+  const decided = useQueryState(api.decisions.list, { code });
+  const addAction = useMutation(api.actions.add);
+  const addDecision = useMutation(api.decisions.add);
+  const update = useMutation(api.actions.update);
+  const [text, setText] = useState("");
+  const [who, setWho] = useState("");
+  const [due, setDue] = useState("");
+  const submit = async (e: FormEvent, decision: boolean) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    try {
+      if (decision) await retrying(() => addDecision({ code, text: text.trim() }));
+      else await retrying(() => addAction({ code, text: text.trim(), ...(who.trim() ? { assignee: who.trim() } : {}), ...(due ? { dueAt: new Date(`${due}T17:00:00`).getTime() } : {}) }));
+      setText(""); setWho(""); setDue("");
+    } catch (error) {
+      onError(error);
+    }
+  };
+  return (
+    <div className="panel-body scroll">
+      <form className="panel-note stack" onSubmit={(e) => void submit(e, false)}>
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="What was decided, or what needs doing" aria-label="Record" maxLength={500} />
+        <div className="row-actions">
+          <input value={who} onChange={(e) => setWho(e.target.value)} placeholder="Owner (name)" aria-label="Owner" style={{ flex: 1 }} />
+          <input type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label="Due" />
+        </div>
+        <div className="row-actions">
+          <button className="primary small" disabled={!text.trim()}>Add action item</button>
+          <button type="button" className="secondary small" disabled={!text.trim()} onClick={(e) => void submit(e as unknown as FormEvent, true)}>Record decision</button>
+        </div>
+        <p className="muted small-text">Or say or type <code>action: @name do this by 2026-12-01</code> or <code>decision: …</code>: the scribe collects them when the call ends.</p>
+      </form>
+      <h3 className="panel-h">Decisions</h3>
+      {(decided.data ?? []).length === 0 ? <p className="muted small-text">None yet.</p> : (decided.data ?? []).map((d) => <div key={d.id} className="note"><div className="message-text">{d.text}</div><div className="muted small-text">{d.madeByName}{d.source !== "person" ? ` · ${d.source}` : ""}</div></div>)}
+      <h3 className="panel-h">Action items</h3>
+      {(items.data ?? []).length === 0 ? <p className="muted small-text">None yet.</p> : (items.data ?? []).map((i) => (
+        <label key={i.id} className={`note action ${i.status}`}>
+          <input type="checkbox" checked={i.status === "done"} onChange={(e) => void update({ id: i.id, status: e.target.checked ? "done" : "open" }).catch(onError)} />
+          <span><span className="message-text">{i.text}</span><span className="muted small-text"> {i.assigneeName ? `· ${i.assigneeName}` : "· unassigned"}{i.dueAt ? ` · due ${new Date(i.dueAt).toLocaleDateString()}` : ""}</span></span>
+        </label>
+      ))}
+    </div>
+  );
+}

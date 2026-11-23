@@ -14,21 +14,25 @@ export const app = feltkit({
   description: "Video meetings that people and agents attend together: chat, reactions, live captions, recaps.",
   roles: {
     // People: create meetings, join calls (media + signaling), chat, captions, notes.
-    member: ["meetings.*", "chat.*", "captions.*", "notes.*", "signal.*", "media.*", "notifications.*", "feltkit.agent.*"],
+    member: ["meetings.*", "chat.*", "captions.*", "notes.*", "signal.*", "media.*", "notifications.*", "actions.*", "decisions.*", "summaries.*", "search.*", "recording.*", "ai.*", "feltkit.agent.*"],
     // Agents: see meetings they may attend, attend (presence only, no media), read the timeline,
     // chat, react, and leave notes for the recap. They cannot create meetings, host, or caption.
-    agent: ["meetings.read", "meetings.attend", "chat.*", "notes.*", "feltkit.agent.*"],
-    // Admins configure the app in Studio → Services: the model, credentials, configuration, API keys.
-    admin: ["intelligence.*", "credential.*", "configuration.*", "apikeys.*", "feltkit.operations.*"],
+    // They also keep the meeting's records (action items, decisions, summaries) and research past meetings.
+    agent: ["meetings.read", "meetings.attend", "chat.*", "notes.*", "actions.*", "decisions.*", "summaries.*", "search.*", "notifications.read", "feltkit.agent.*"],
+    // Admins configure the app in Studio → Services (the model, credentials, API keys) and here: branding,
+    // retention, and the maintenance sweep a schedule runs.
+    admin: ["intelligence.*", "credential.*", "configuration.*", "apikeys.*", "settings.*", "maintenance.*", "notifications.send", "jobs.*", "schedules.*", "feltkit.operations.*"],
+    // The application's own agents (feltkit/agents.ts): each holds only what its work needs, as its own principal.
+    scribe: ["scribe.run", "notifications.send"],
+    assistant: ["assistant.run"],
   },
   // People sign up and sign in with an e-mail address and a password. A new account is a member.
   auth: {
     accounts: { roles: ["member"] },
     // When a session ends (sign-out, revocation, expiry), FeltKit runs this as that session's principal, so
-    // the connections it held end at once (session-bound presence). Platforms without the hook ignore it, and
-    // presence then ends by expiry instead.
+    // the connections it held end at once (session-bound presence; FeltKit 0.3.37).
     onSessionEnd: "calls:sessionEnded",
-  } as any,
+  },
   dev: {
     users: [
       { id: "ada", name: "Ada Lovelace", roles: ["member", "admin"] },
@@ -37,7 +41,11 @@ export const app = feltkit({
     ],
   },
   services: {
-    notifications: { types: ["meeting.invited"] },
+    notifications: { types: ["meeting.invited", "actionitem.assigned", "actionitem.due", "recap.ready"] },
+    // The sweep (feltkit/maintenance.ts) ends calls nobody is writing to, sends due reminders and applies the
+    // retention policy. An admin schedules it once: Studio → Services → Schedules, job type maintenance.sweep.
+    jobs: { handlers: { "maintenance.sweep": "maintenance:sweep" } },
+    schedules: true,
     configuration: true,
     // An API key holds the agent role: that is how an agent outside this machine attends.
     apiKeys: { roles: ["agent"] },
@@ -56,6 +64,8 @@ export const meetings = app.collection(
     // link: anyone signed in who has the code (people or agents). invited: the host and the listed principal ids.
     access: s.enum(["link", "invited"] as const),
     invited: s.array(s.string()),
+    // Which agents may attend: only those the host listed in `invited` (approved), or any agent holding the link (open).
+    agents: s.optional(s.enum(["approved", "open"] as const)),
     scheduledFor: s.optional(s.number()),
     createdAt: s.number(),
   },
@@ -70,8 +80,13 @@ export const calls = app.collection(
     number: s.integer({ minimum: 1 }),
     startedAt: s.number(),
     endedAt: s.optional(s.number()),
+    // True until the call ends: the maintenance sweep finds calls nobody is writing to without scanning history.
+    open: s.optional(s.boolean()),
+    // The latest recording of this call. Recording is the host's browser capturing the call (feltkit/recording.ts);
+    // everyone sees that it is on, and the call keeps who started it and when.
+    recording: s.optional(s.object({ by: s.string(), byName: s.string(), startedAt: s.number(), stoppedAt: s.optional(s.number()) })),
   },
-  { unique: [["meetingId", "number"]], indexes: [{ fields: ["meetingId"] }] },
+  { unique: [["meetingId", "number"]], indexes: [{ fields: ["meetingId"] }, { fields: ["open"] }] },
 );
 
 

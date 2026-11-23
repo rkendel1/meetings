@@ -21,6 +21,11 @@
       "reason": "browser media transport (WebRTC mesh); the boundary an SFU would replace"
     },
     {
+      "path": "src/recorder.ts",
+      "class": "infrastructure",
+      "reason": "browser-side recording of the call (mixed audio and drawn tiles saved on the host's device): FeltKit has no media layer; an SFU-side recorder would replace it"
+    },
+    {
       "path": "scripts/e2e.mjs",
       "class": "tests",
       "reason": "browser end-to-end and failure-condition acceptance script"
