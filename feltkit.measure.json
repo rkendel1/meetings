@@ -44,6 +44,11 @@
       "path": "scripts/netlab",
       "class": "tests",
       "reason": "cross-network test lab (namespaces, NAT, coturn) and its scenario runner"
+    },
+    {
+      "path": "demo.json",
+      "class": "configuration",
+      "reason": "switches demo mode (shared personas, read-only open Studio, one-day retention) for the server and the browser bundle"
     }
   ],
   "acknowledged": {

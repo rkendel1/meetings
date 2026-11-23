@@ -8,6 +8,7 @@
  * and read the same timeline (chat + captions) people see.
  */
 import { feltkit, s } from "@feltdb/feltkit";
+import demo from "../demo.json";
 
 export const app = feltkit({
   name: "meetings",
@@ -25,6 +26,9 @@ export const app = feltkit({
     // The application's own agents (feltkit/agents.ts): each holds only what its work needs, as its own principal.
     scribe: ["scribe.run", "notifications.send"],
     assistant: ["assistant.run"],
+    janitor: ["janitor.run", "notifications.send"],
+    // A read-only look at Studio for a public demo (see `auth.authenticate` below). It can read, never change.
+    "studio-viewer": ["feltkit.operations.read"],
   },
   // People sign up and sign in with an e-mail address and a password. A new account is a member.
   auth: {
@@ -32,6 +36,14 @@ export const app = feltkit({
     // When a session ends (sign-out, revocation, expiry), FeltKit runs this as that session's principal, so
     // the connections it held end at once (session-bound presence; FeltKit 0.3.37).
     onSessionEnd: "calls:sessionEnded",
+    // A PUBLIC DEMO ONLY (demo.json "openStudio", with Studio on: FELTKIT_DASHBOARD=1, which `feltkit fly deploy` sets):
+    // Studio opens for anyone with no key, as a read-only viewer. Production Studio never serves data edits, function runs, capability calls or model changes
+    // to any operator, and this role can read only. Everything else stays on the application's own sessions: the hook
+    // answers nothing for any path but Studio's API, and nothing at all unless demo.json says so.
+    authenticate: (request) =>
+      demo.openStudio === true && request.method === "GET" && request.path.startsWith("/_feltkit/api/")
+        ? { id: "demo-studio", type: "user", displayName: "Demo visitor (read-only)", roles: ["studio-viewer"] }
+        : null,
   },
   dev: {
     users: [
@@ -52,6 +64,9 @@ export const app = feltkit({
     intelligence: true,
   },
 });
+
+/** When housekeeping last ran (feltkit/agents.ts, the janitor): one record. */
+export const housekeeping = app.collection("housekeeping", { key: s.string({ maxLength: 16 }), lastAt: s.number() }, { unique: [["key"]] });
 
 /** A meeting: a stable room with a short code. Calls happen in it, one at a time. */
 export const meetings = app.collection(

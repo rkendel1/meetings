@@ -3,6 +3,7 @@ import { calls, entries, meetings } from "./app.js";
 import { append, callState, endPeer, kindOf, latestCall, mayAttend, mayReadCall, meetingFor, nameOf, newCode, type Call, type Meeting } from "./_meeting.js";
 import { actionItems, decisions, purgeMeeting, summaries } from "./_records.js";
 import { peers } from "./_presence.js";
+import { kickJanitor } from "./maintenance.js";
 import { CallOut, EntryOut, MeetingOut, PeerOut, strip, stripEntry, stripPeer } from "./_schemas.js";
 import { app } from "./app.js";
 
@@ -51,6 +52,7 @@ export const create = app.mutation({
     const guests = [...new Set((invited ?? []).map((x: string) => x.trim()).filter((x: string) => x && x !== me.id))];
     const record = { code, title: title.trim(), hostId: me.id, hostName: nameOf(me), access: access ?? "link", invited: guests, agents: agents ?? "approved", ...(scheduledFor ? { scheduledFor } : {}), createdAt: Date.now() };
     const id = await ctx.db.insert(meetings, record);
+    await kickJanitor(ctx);
     for (const recipient of guests) {
       ctx.afterCommit.notifications.send({ recipient, type: "meeting.invited", title: `${nameOf(me)} invited you to "${record.title}"`, data: { code }, idempotencyKey: `invite:${id}:${recipient}` });
     }

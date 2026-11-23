@@ -6,6 +6,7 @@ import { Home } from "./Home";
 import { Call } from "./Call";
 import { Recap } from "./Recap";
 import { Settings } from "./Settings";
+import { DEMO, PERSONAS, chosenPersona, signInAsPersona } from "./demo";
 import { BrandMark, useApplyBrand, useBrand } from "./brand";
 import { describe, navigate, useRoute } from "./util";
 
@@ -29,6 +30,20 @@ export function App() {
       void signInAsDevUser(session.devUsers[0]!.id);
     }
   }, [session, principal, signInAsDevUser]);
+
+  // Demo build: no sign-in screen. The first visit signs in as a persona (creating its account the first time).
+  const [demoStarting, setDemoStarting] = useState(DEMO);
+  const demoTried = useRef(false);
+  useEffect(() => {
+    if (!DEMO || !session || principal || demoTried.current || session.devUsers.length) return;
+    demoTried.current = true;
+    void signInAsPersona({ signIn, signUp }, chosenPersona().id)
+      .catch((error) => setNotice({ tone: "error", text: `The demo could not sign you in: ${describe(error)}` }))
+      .finally(() => setDemoStarting(false));
+  }, [session, principal, signIn, signUp]);
+  useEffect(() => {
+    if (principal) setDemoStarting(false);
+  }, [principal]);
 
   useEffect(() => {
     if (!notice) return;
@@ -73,7 +88,15 @@ export function App() {
                 </select>
               </label>
             )}
-            {principal && !session?.devUsers.length && (
+            {DEMO && principal && (
+              <label className="identity">
+                <span className="sr-only">Demo persona</span>
+                <select value={PERSONAS.find((p) => p.name === principal.displayName)?.id ?? ""} aria-label="Demo persona" title="Switch persona to meet yourself: open a second browser as someone else" onChange={(e) => void signOut().then(() => signInAsPersona({ signIn, signUp }, e.target.value)).catch(report)}>
+                  {PERSONAS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </label>
+            )}
+            {!DEMO && principal && !session?.devUsers.length && (
               <button className="secondary small" onClick={() => void signOut().catch(report)} title={principal.displayName ?? principal.id}>Sign out</button>
             )}
             {isAdmin && <a className="dashboard-link" href="/settings" onClick={(e) => (e.preventDefault(), navigate({ page: "settings" }))}>Settings</a>}
@@ -94,6 +117,8 @@ export function App() {
         <div className="center muted">Connecting…</div>
       ) : resetToken ? (
         <div className="center"><div className="card narrow"><ResetForm token={resetToken} onDone={() => (setResetToken(null), setNotice({ tone: "info", text: "Your password is set." }))} /></div></div>
+      ) : !principal && DEMO && demoStarting ? (
+        <div className="center muted">Starting the demo…</div>
       ) : !principal ? (
         <SignedOut brand={brand} devUsers={session.devUsers} accounts={session.accounts ?? null} onDevSignIn={(id) => signInAsDevUser(id).catch(report)} onSignIn={signIn} onSignUp={signUp} />
       ) : route.page === "call" ? (

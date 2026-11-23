@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useFeltKit, useMutation, useQueryState } from "@feltdb/feltkit/react";
 import { api } from "../feltkit/_generated/api";
 import { useBrand } from "./brand";
+import { DEMO } from "./demo";
 import { codeFrom, describe, navigate, when } from "./util";
 
 export function Home({ me, onError }: { me: { id: string; name: string }; onError: (e: unknown) => void }) {
@@ -58,6 +59,7 @@ export function Home({ me, onError }: { me: { id: string; name: string }; onErro
 
   return (
     <main className="home">
+      {DEMO && <p className="notice info" role="note">This is a demo: you are {me.name}, a persona everyone here shares. To meet yourself, open this page in a second browser and switch persona in the header. Meetings are visible to everyone and are cleared regularly.</p>}
       <section className="hero">
         <h1>{brand.tagline ?? "Meet with your team, and with your agents."}</h1>
         <p className="muted">Video, screen share, chat and live captions in the browser. Agents attend through MCP: they follow what is said, keep the decisions and action items, and research earlier meetings.</p>

@@ -14,9 +14,34 @@ Everything below was measured on 2026-11-23 against `@feltdb/feltkit` 0.3.37 (`n
 |---|---|
 | **Brand it** | Sign in as an admin → **Settings**: name, tagline, accent colour, logo. It is a public query, so the sign-in page wears it before anyone signs in, and every open page changes at once. |
 | **Turn on the model** | `npx feltkit model set --provider anthropic --model <model> --api-key-stdin` (or Studio → Models). Any provider FeltKit supports, or a Resolver reference. Without one, "Write an AI recap" and "Ask AI" say so; everything else works. |
-| **Run housekeeping** | Studio → Services → Schedules: job type `maintenance.sweep`, every minute. It ends calls nobody is writing to, sends due reminders, applies retention. (Settings → "Run the sweep now" does it once.) |
+| **Housekeeping** | Nothing to schedule: whenever a meeting is created or a call starts, the **janitor** agent (at most every 5 minutes) ends calls nobody is writing to, sends due reminders and applies retention. A quiet system sends reminders late; to fix that, schedule job type `maintenance.sweep` in a development Studio, or run Settings → "Run the sweep now". (Production Studio cannot create schedules.) |
 | **Keep meetings N days** | Settings → retention. The sweep deletes meetings that long after their last call. |
 | **Let an agent in** | `npx feltkit session create --type agent --id claude --role agent` (or an API key in production), then the host adds `claude` to the invited ids, or opens the meeting to any agent. Agents the host did not approve cannot even see that the meeting exists. |
+
+## Publish it as a demo on Fly
+
+**`demo.json` is on in this repository.** With it, a visitor lands on Home already signed in as one of three shared
+personas (Ada, Grace, Alan) with "Start a meeting now" in front of them, and Studio opens with no key. Set
+`personas` and `openStudio` to `false` (and delete `retentionDays`) before deploying anything that is not a throwaway demo.
+
+```bash
+npx feltkit deploy            # choose fly: builds with demo.json, boots the build, writes .feltkit/deploy
+npx feltkit fly deploy        # creates the app and its volume, sets secrets (Studio on, operator key), deploys
+```
+
+Before the first deploy, edit `.feltkit/deploy/fly.toml`: `app` must be unique on Fly, and set `primary_region`. A
+later `npx feltkit deploy` regenerates that file (it keeps the volume's state).
+
+What a visitor gets, and the cost of it:
+
+| | What happens | What to know |
+|---|---|---|
+| Sign-in | The browser signs in as a persona; the account is created the first time anyone does. The header switcher changes persona, so one visitor can meet themselves in two browsers. | Personas are ordinary `member` accounts with a **public password** (`src/demo.ts`). Every visitor shares three identities: they see each other's meetings, codes and timelines. Retention is one day (`demo.json`). Nobody can brand or administer from the app; do that in Studio as an operator (`npx feltkit manage`). Sign-up stays open, so strangers can also create real accounts. |
+| Studio | `/_feltkit/` opens with no key as a read-only viewer: the "Studio ↗" link in the header. It can read data, activity, agents, jobs and readiness, and **can change nothing** (production Studio never serves data edits, function runs, capability calls or model changes, and the role is read-only). | It does show everything stored: meeting titles and codes, chat, captions, account e-mails (password hashes are redacted). Not for real data. A development Studio's admin token is a different thing and is never exposed. |
+| Model | Off until you set one on the host: `npx feltkit model set --env production --provider … --model … --api-key-stdin` (server stopped), or the demo's AI buttons say "No model is configured". | Anyone can press "Write an AI recap" and "Ask AI": use a key with a spend cap. |
+| Reminders | Late in a quiet system (see Housekeeping). | |
+
+`npm run e2e:demo` checks the demo's guarantees against a production build (`FELTKIT_DASHBOARD=1 npx feltkit start`).
 
 ## What a meeting leaves behind
 
@@ -103,7 +128,7 @@ Three things the starter showed about the shape of the work:
 | Recording | The host's browser records the mixed call and saves a file on the host's device; the server keeps the notice, who started it and when, and stops it when the call ends. | Memory-bound (long calls), host-only, no server copy, no transcription of audio. A recording bot or SFU recorder replaces `recorder.ts`. |
 | A complete transcript | Captions come from each person's browser (Chrome/Edge/Safari); anyone with captions off, or a browser without them, is not transcribed. | Recaps are only as complete as the captions and chat. Server-side speech-to-text needs audio at a server (SFU or bot). |
 | The model at call end | `app.agent` handlers have no `ctx.model` (only `app.action` does), so the scribe is deterministic and a person asks for the model's recap. | No automatic AI summary without a person. |
-| Declaring a schedule | The sweep job is registered, but the schedule is created in Studio. | One manual step per environment (`config import` skips schedules). |
+| Declaring a schedule | The janitor agent runs housekeeping when a meeting is created or a call starts, so no schedule is needed. | Reminders can be late in a quiet system; production Studio and `config import` cannot create schedules. |
 | Full-text search | A bounded scan (20,000 timeline lines per search; says when it was cut). | Fine for a team; a large tenant needs an index. |
 | Per-workspace branding | One brand per deployment. | A multi-tenant SaaS needs `auth.tenant` and tenant-scoped collections. |
 | Guests without accounts | Not possible: every attendee has a FeltKit identity. | No anonymous guest link. |
@@ -113,6 +138,8 @@ The upstream asks that would remove these are in [UPSTREAM-ASKS.md](UPSTREAM-ASK
 
 ## Not verified
 
+- **The demo auto sign-in and the persona switcher** ran only as their HTTP equivalent (`e2e:demo`); the React code in `src/App.tsx` was never executed.
+- **Nothing was deployed to Fly.** `npx feltkit deploy --target fly` was run and its build boots, and `npx feltkit fly deploy --dry-run` shows what it would set; `flyctl` was not run.
 - **No browser run of the new UI.** The sandbox this was built in would not install a browser. The new screens
   (Settings, Records tab, recording, recap sections, search, "Ask AI") typecheck and build, and their server side
   is exercised, but nobody has clicked them. `scripts/e2e.mjs` and `scripts/e2e-session-expiry.mjs` were updated
@@ -126,8 +153,9 @@ The upstream asks that would remove these are in [UPSTREAM-ASKS.md](UPSTREAM-ASK
 ## Verification
 
 ```bash
-npm test                      # 40 backend tests: records, scribe, search, recording, branding, sweep, deletion, agent admission
+npm test                      # 41 backend tests: records, scribe, search, recording, branding, sweep, deletion, agent admission
 npm run typecheck && npm run build && npm run measure -- --check
+npm run e2e:demo              # needs a production build running: FELTKIT_DASHBOARD=1 npx feltkit start --port 3200
 npm run dev                   # then, in another shell:
 npm run e2e:starter           # 7 checks over HTTP + MCP, with a loopback OpenAI-compatible model standing in for a provider
 ```

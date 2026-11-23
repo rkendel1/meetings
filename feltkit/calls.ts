@@ -3,6 +3,7 @@ import { app, calls } from "./app.js";
 import { peers } from "./_presence.js";
 import { append, endPeer, finishCall, isLive, kindOf, latestCall, meetingFor, nameOf, ownPeer, sessionRefOf, settle, type Meeting, type Peer } from "./_meeting.js";
 import { meetings } from "./app.js";
+import { kickJanitor } from "./maintenance.js";
 
 const Joined = s.object({ peerId: s.string(), callId: s.string(), callNumber: s.integer(), started: s.boolean() });
 
@@ -41,6 +42,7 @@ export const join = app.mutation({
       const id = await ctx.db.insert(calls, { meetingId: meeting.id, number, startedAt: now, open: true });
       call = { id, meetingId: meeting.id, number, startedAt: now, open: true };
       started = true;
+      await kickJanitor(ctx);
     }
     // The name everyone sees, and that captions and the recap are attributed to, is the principal's own:
     // never a name the request chooses, so nobody can speak as someone else.

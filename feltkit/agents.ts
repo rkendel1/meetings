@@ -7,7 +7,8 @@
  *   assistant  speaks in the timeline for a person who asked it a question, so an answer is never attributed to them.
  */
 import { s } from "@feltdb/feltkit";
-import { app, calls, entries, meetings } from "./app.js";
+import { app, calls, entries, housekeeping, meetings } from "./app.js";
+import { SWEEP_EVERY_MS, sweepNow } from "./maintenance.js";
 import { peers } from "./_presence.js";
 import { append, byCode, latestCall, type Call, type Meeting, type Peer } from "./_meeting.js";
 import { addAction, addDecision, marker, parseAction, summaries, type Summary } from "./_records.js";
@@ -74,5 +75,25 @@ export const assistant = app.agent("assistant", {
     const call = await latestCall(ctx, meeting.id);
     // FeltKit commits an agent run's writes at most once per trigger, so a retry cannot post the answer twice.
     await append(ctx, meeting, { ...(call && call.endedAt === undefined ? { callId: call.id } : {}), kind: "chat", text: `${input.askedBy ? `${input.askedBy} asked: ${input.question}\n` : ""}${input.answer}`.slice(0, 3990), author: { id: "assistant", name: "Assistant", kind: "agent" } });
+  },
+});
+
+/**
+ * Housekeeping with nobody scheduling it: staged whenever a meeting is created or a call starts, it does a round of
+ * the sweep (feltkit/maintenance.ts) if none ran in the last five minutes. Production Studio cannot create
+ * schedules, and a demo has no admin, so the application keeps itself tidy.
+ */
+export const janitor = app.agent("janitor", {
+  principal: { id: "janitor", displayName: "Janitor" },
+  roles: ["janitor"],
+  access: "janitor.run",
+  description: "Ends abandoned calls, sends due reminders and applies retention, at most every five minutes.",
+  handler: async (ctx) => {
+    const now = Date.now();
+    const [last] = await ctx.db.find(housekeeping, { key: "sweep" }, { limit: 1 });
+    if (last && now - last.lastAt < SWEEP_EVERY_MS) return;
+    if (last) await ctx.db.patch(housekeeping, last.id, { lastAt: now });
+    else await ctx.db.insert(housekeeping, { key: "sweep", lastAt: now });
+    await sweepNow(ctx);
   },
 });

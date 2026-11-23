@@ -1,0 +1,6 @@
+{
+  "_": "Demo mode for a publicly hosted demo. Read by the server and the browser bundle at build time, so a plain `npx feltkit deploy` carries it. personas: visitors are signed in as shared Ada/Grace/Alan; openStudio: production Studio opens with no key, read-only; retentionDays: default retention while no admin has set one. Set personas and openStudio to false (and remove retentionDays) for a real deployment.",
+  "personas": true,
+  "openStudio": true,
+  "retentionDays": 1
+}

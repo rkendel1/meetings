@@ -19,13 +19,14 @@ function clock(start = realNow()) {
 }
 
 /** Agent runs and notifications happen after the commit, detached: wait until the outbox has nothing left to do. */
-async function drain(t: any) {
+async function drain(t: any, wait?: () => void) {
   for (let i = 0; i < 100; i++) {
     await t.runtime.runServices();
     const all = await t.runtime.listOutbox();
     const failed = all.find((r: any) => r.state === "failed");
     if (failed) throw new Error(`an after-commit effect failed: ${failed.effect.service}.${failed.effect.method}: ${failed.error?.message}`);
     if (!all.some((r: any) => r.state === "pending" || r.state === "performing")) return;
+    wait?.(); // a frozen test clock never reaches a retry's backoff: move it on
     await new Promise((r) => setTimeout(r, 20));
   }
   throw new Error("the outbox did not drain");
@@ -65,7 +66,7 @@ test("action items: assigned by first name, the assignee is told, only the right
   const t = await createTestApp();
   try {
     const { m } = await call(t);
-    const made = await t.as("ada").mutation(api.actions.add, { code: m.code, text: "Send the budget", assignee: "grace", dueAt: Date.now() + 86_400_000 });
+    const made = await t.as("ada").mutation(api.actions.add, { code: m.code, text: "Send the budget", assignee: "grace", dueAt: Date.now() + 3 * 86_400_000 });
     assert.equal(made.created, true);
     await assert.rejects(t.as("ada").mutation(api.actions.add, { code: m.code, text: "x", assignee: "nobody" }), (e) => code(e) === "INVALID_ARGUMENT");
     // Someone who never took part cannot add to, read or change a meeting's records.
@@ -254,6 +255,33 @@ test("the sweep ends calls nobody is writing to, reminds owners, and applies ret
     await assert.rejects(t.as("ada").query(api.meetings.get, { code: m.code }), (e) => code(e) === "NOT_FOUND");
     assert.deepEqual(await t.as("grace").query(api.actions.list, { mine: true }), []);
     void a; void item;
+  } finally {
+    c.restore();
+    await t.close();
+  }
+});
+
+test("nobody has to schedule housekeeping: starting a meeting makes the janitor tidy up, at most every five minutes", async () => {
+  const c = clock();
+  const t = await createTestApp();
+  try {
+    const { m } = await call(t, "Abandoned");
+    await t.as("ada").mutation(api.chat.send, { code: m.code, text: "decision: keep the demo short" });
+    c.advance(10 * 60_000); // every browser died: nothing writes to the call
+    assert.equal((await t.as("ada").query(api.summaries.get, { code: m.code })).summary, null);
+
+    await t.as("alan").mutation(api.meetings.create, { title: "Next" }); // someone else starts a meeting
+    await drain(t, () => c.advance(2_000));
+    const { summary } = await t.as("ada").query(api.summaries.get, { code: m.code });
+    assert.equal(summary!.source, "scribe", "the janitor ended the abandoned call and the scribe wrote it up");
+    assert.deepEqual((await t.as("ada").query(api.decisions.list, { code: m.code })).map((d: any) => d.text), ["keep the demo short"]);
+
+    // Another meeting right away does not sweep again; one more than five minutes later does (and applies retention).
+    const second = await call(t, "Second");
+    c.advance(10 * 60_000);
+    await t.as("alan").mutation(api.meetings.create, { title: "Later" });
+    await drain(t, () => c.advance(2_000));
+    assert.ok((await t.as("ada").query(api.summaries.get, { code: second.m.code })).summary, "swept again after the interval");
   } finally {
     c.restore();
     await t.close();

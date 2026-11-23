@@ -18,6 +18,7 @@
     "capacity": "node scripts/capacity.mjs",
     "e2e:identity": "node scripts/e2e-identity.mjs",
     "e2e:starter": "node scripts/e2e-starter.mjs",
+    "e2e:demo": "node scripts/e2e-demo.mjs",
     "measure": "feltkit measure"
   },
   "dependencies": {

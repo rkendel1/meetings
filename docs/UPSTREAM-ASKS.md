@@ -17,7 +17,9 @@ What would let this application delete code it owns or stop working around a lim
 | K2 | Transient messages: ephemeral, authorized per subscriber, no durable record | `signals.ts` (59 lines); typing and hand-raise fan-out | P1 | built |
 | K3 | Per-principal and per-function rate limits and quotas, with `retryAfter` | chat/reaction abuse (G7); signaling limits are app counters today | P1 | read (SECURITY.md: none on FeltKit endpoints) |
 | K4 | `ctx.model.generate` in `app.agent` handlers | The scribe cannot use the model; a person must ask for the AI recap | P1 | built |
-| K5 | Declaring schedules in code (`services.schedules: [{ job, every }]`), and importing them with `config import` | The sweep needs a manual Studio step per environment | P1 | read (`config import` skips schedules) |
+| K5 | Declaring schedules in code (`services.schedules: [{ job, every }]`); creating them from production Studio or `config import` | Production Studio cannot create a schedule at all; the janitor agent is the workaround | P1 | built, read (GUARANTEES.md production operations) |
+| K14 | Passing arbitrary non-secret settings to `feltkit fly deploy` (it forwards a fixed list: `FELTKIT_*`, `MAILPORT_*`) and keeping `fly.toml` edits across `feltkit deploy` | Demo and feature flags had to move into a committed `demo.json` | P2 | built |
+| K15 | A supported "open read-only Studio" mode (a viewer role without an `auth.authenticate` hook) | Public demos | P3 | built |
 | K6 | Guest principal: link-scoped, display name, restricted role | Attendees without accounts | P1 | not checked |
 | K7 | Per-workspace branding and public pre-auth tenant resolution (slug or domain) | One brand per deployment today | P1 | not checked |
 | K8 | Resource-scoped grants (the host admits one agent to one meeting) | Agent admission is an app predicate over an `invited` list | P2 | built |
