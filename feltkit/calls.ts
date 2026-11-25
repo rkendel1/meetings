@@ -1,7 +1,7 @@
 import { fail, s } from "@feltdb/feltkit";
 import { app, calls } from "./app.js";
-import { peers } from "./_presence.js";
-import { append, endPeer, finishCall, isLive, kindOf, latestCall, meetingFor, nameOf, ownPeer, sessionRefOf, settle, type Meeting, type Peer } from "./_meeting.js";
+import { enforceIdle, idleDue, idleEndsAt, peers } from "./_presence.js";
+import { append, endPeer, finishCall, isLive, kindOf, latestCall, meetingFor, nameOf, noteActivity, ownPeer, requireOpen, sessionRefOf, settle, type Meeting, type Peer } from "./_meeting.js";
 import { meetings } from "./app.js";
 import { kickJanitor } from "./maintenance.js";
 
@@ -11,7 +11,8 @@ const Joined = s.object({ peerId: s.string(), callId: s.string(), callNumber: s.
  * Join the meeting's call. A person starts it if none is running; each browser tab is its own
  * connection, and `replaces` hands over from the caller's previous connection (a page refresh).
  * An agent attends a running call (presence only, no media); calling join again while attending
- * refreshes its presence, so an agent uses join as its check-in.
+ * refreshes its presence, so an agent uses join as its check-in. A meeting that was ended (closed) refuses everyone
+ * until the host reopens it.
  */
 export const join = app.mutation({
   access: "meetings.attend",
@@ -23,15 +24,22 @@ export const join = app.mutation({
   },
   returns: Joined,
   retry: { sequenceConflicts: 5 },
-  capability: { name: "meetings.join", description: "Attend the meeting's live call. Agents get presence (shown as an AI agent) and no media; call it again at least every 30 s to stay present, and read what is said with meetings.feed." },
+  capability: { name: "meetings.join", description: "Attend the meeting's live call. Agents get presence (shown as an AI agent) and no media; call it again at least every 30 s to stay present, and read what is said with meetings.feed. Refused, with the reason, when the meeting was ended." },
   handler: async (ctx, { code, mic, cam, replaces }) => {
     const meeting = await meetingFor(ctx, code);
+    requireOpen(meeting);
     const me = ctx.auth.requirePrincipal();
     const kind = kindOf(me);
     const now = Date.now();
     if (replaces) {
       const old = (await ctx.db.get(peers, replaces)) as Peer | null;
       if (old && old.principalId === me.id && old.meetingId === meeting.id && old.leftAt === undefined) await endPeer(ctx, old, now, "replaced");
+    }
+    // A person arriving is activity (an agent's never is). It counts before the call is settled, so a call that was
+    // about to ask "Still here?" does not, and one whose prompt already ran out ends and this person starts a new one.
+    if (kind === "person") {
+      const running = await latestCall(ctx, meeting.id);
+      if (running && running.endedAt === undefined) await noteActivity(ctx, running, now);
     }
     let call = await settle(ctx, meeting, now);
     let started = false;
@@ -65,7 +73,11 @@ export const join = app.mutation({
   },
 });
 
-/** Stay in the call, and publish what this connection is sharing. Every 15 s from each tab. */
+/**
+ * Stay in the call, and publish what this connection is sharing. Every 15 s from each tab. A person turning their mic,
+ * camera or screen share on or off is activity; a heartbeat that changes nothing is not, so a forgotten tab does not keep
+ * the call alive. The heartbeat is also what carries the idle check to a call nobody else is writing to.
+ */
 export const heartbeat = app.mutation({
   access: "meetings.attend",
   args: { peerId: s.string(), mic: s.optional(s.boolean()), cam: s.optional(s.boolean()), screen: s.optional(s.boolean()), hand: s.optional(s.boolean()) },
@@ -74,8 +86,40 @@ export const heartbeat = app.mutation({
     const peer = await ownPeer(ctx, peerId);
     const call = await ctx.db.get(calls, peer.callId);
     if (!call || call.endedAt !== undefined) fail("FAILED_PRECONDITION", "This call has ended.", { reason: "ended" });
+    const now = Date.now();
     const media = peer.kind === "person" ? { ...(mic !== undefined ? { mic } : {}), ...(cam !== undefined ? { cam } : {}), ...(screen !== undefined ? { screen } : {}) } : {};
-    await ctx.db.patch(peers, peer.id, { lastSeenAt: Date.now(), ...media, ...(hand !== undefined ? { hand } : {}) });
+    await ctx.db.patch(peers, peer.id, { lastSeenAt: now, ...media, ...(hand !== undefined ? { hand } : {}) });
+    const changed = peer.kind === "person" && ((mic !== undefined && mic !== peer.mic) || (cam !== undefined && cam !== peer.cam) || (screen !== undefined && screen !== peer.screen));
+    if (changed) await noteActivity(ctx, call, now);
+    else if (idleDue(call, now)) {
+      const meeting = (await ctx.db.get(meetings, call.meetingId)) as Meeting | null;
+      if (meeting) await enforceIdle(ctx, meeting, call, now);
+    }
+    return { ok: true };
+  },
+});
+
+/**
+ * Answer the "Still here?" prompt: a person in the call says so, and the call carries on. Too late (the prompt's time
+ * has run out) and the call ends instead; the answer says which.
+ */
+export const stillHere = app.mutation({
+  access: "meetings.attend",
+  args: { peerId: s.string() },
+  returns: s.object({ ok: s.boolean() }),
+  handler: async (ctx, { peerId }) => {
+    const peer = await ownPeer(ctx, peerId);
+    if (peer.kind !== "person") fail("FORBIDDEN", "Only a person in the call can say the call is still in use.");
+    const call = await ctx.db.get(calls, peer.callId);
+    if (!call || call.endedAt !== undefined) fail("FAILED_PRECONDITION", "This call has ended.", { reason: "ended" });
+    const now = Date.now();
+    const ends = idleEndsAt(call);
+    if (ends !== undefined && now >= ends) {
+      const meeting = (await ctx.db.get(meetings, call.meetingId)) as Meeting | null;
+      if (meeting) await enforceIdle(ctx, meeting, call, now);
+      return { ok: false };
+    }
+    await noteActivity(ctx, call, now);
     return { ok: true };
   },
 });
@@ -104,7 +148,7 @@ export const leave = app.mutation({
   },
 });
 
-/** The host ends the call for everyone, or removes one connection. */
+/** The host ends the call for everyone, or removes one connection. (Ending the whole meeting is meetings.endMeeting.) */
 export const end = app.mutation({
   access: "meetings.host",
   args: { code: s.string({ maxLength: 64 }), peerId: s.optional(s.string()) },

@@ -1,6 +1,6 @@
 import { fail, s } from "@feltdb/feltkit";
 import { calls, entries, meetings } from "./app.js";
-import { append, callState, endPeer, kindOf, latestCall, mayAttend, mayReadCall, meetingFor, nameOf, newCode, type Call, type Meeting, requireStanding } from "./_meeting.js";
+import { append, byCode, callState, endPeer, finishCall, isOrgAdmin, kindOf, latestCall, mayAttend, mayReadCall, meetingFor, nameOf, newCode, type Call, type Meeting, requireStanding } from "./_meeting.js";
 import { actionItems, decisions, purgeMeeting, summaries } from "./_records.js";
 import { peers } from "./_presence.js";
 import { kickJanitor } from "./maintenance.js";
@@ -90,12 +90,70 @@ export const update = app.mutation({
   },
 });
 
+/**
+ * End the meeting: the call ends for everyone (the recording stops, the scribe writes the recap) and the meeting is
+ * closed, so the same link no longer starts a call. Everything it kept stays. The host does this, or an organization
+ * administrator when the host is not in the call. Any other member, and any agent, is refused. A closed meeting is
+ * refused at join (feltkit/calls.ts), whoever asks.
+ */
+export const endMeeting = app.mutation({
+  access: "meetings.host",
+  args: { code: s.string({ maxLength: 64 }) },
+  returns: s.object({ ok: s.boolean(), closedAt: s.number() }),
+  retry: { sequenceConflicts: 5 },
+  handler: async (ctx, { code }) => {
+    const me = ctx.auth.requirePrincipal();
+    if (kindOf(me) !== "person") fail("FORBIDDEN", "People end meetings.");
+    const meeting = await byCode(ctx, code);
+    const isHost = meeting?.hostId === me.id;
+    const admin = isOrgAdmin(ctx);
+    // An administrator is not necessarily invited, so the usual attendance check is not what decides here; for anyone
+    // else, a meeting they may not attend looks like no meeting at all.
+    if (!meeting || (!isHost && !admin && !mayAttend(meeting, me.id, "person"))) fail("NOT_FOUND", "No meeting with that code, or you are not invited to it.");
+    const now = Date.now();
+    const running = await latestCall(ctx, meeting.id);
+    const live = running && running.endedAt === undefined ? await callState(ctx, running, now) : null;
+    if (!isHost) {
+      if (!admin) fail("FORBIDDEN", "Only the host can end this meeting.");
+      if (live?.live.some((p) => p.kind === "person" && p.principalId === meeting.hostId)) fail("FORBIDDEN", "The host is in the call. An administrator can end the meeting when the host is gone.");
+    }
+    if (meeting.closed) return { ok: true, closedAt: meeting.closedAt ?? now };
+    const who = nameOf(me);
+    if (running && running.endedAt === undefined) {
+      for (const p of (live ?? (await callState(ctx, running, now))).peers) if (p.leftAt === undefined) await endPeer(ctx, p, now, "ended");
+      await finishCall(ctx, running, now);
+      await append(ctx, meeting, { callId: running.id, kind: "system", text: `${who} ended the meeting${isHost ? "" : " (an administrator, the host being away)"}` });
+    } else {
+      await append(ctx, meeting, { kind: "system", text: `${who} ended the meeting${isHost ? "" : " (an administrator, the host being away)"}` });
+    }
+    await ctx.db.patch(meetings, meeting.id, { closed: true, closedAt: now, closedByName: who });
+    return { ok: true, closedAt: now };
+  },
+});
+
+/** The host reopens a meeting that was ended: the link starts calls again. Its records were never touched. */
+export const reopen = app.mutation({
+  access: "meetings.host",
+  args: { code: s.string({ maxLength: 64 }) },
+  returns: s.object({ ok: s.boolean() }),
+  retry: { sequenceConflicts: 5 },
+  handler: async (ctx, { code }) => {
+    const meeting = await meetingFor(ctx, code);
+    const me = ctx.auth.requirePrincipal();
+    if (meeting.hostId !== me.id) fail("FORBIDDEN", "Only the host can reopen this meeting.");
+    if (!meeting.closed) return { ok: true };
+    await ctx.db.patch(meetings, meeting.id, { closed: false });
+    await append(ctx, meeting, { kind: "system", text: `${nameOf(me)} reopened the meeting` });
+    return { ok: true };
+  },
+});
+
 /** A meeting and its call right now: who is in it (people and agents) and what they share. */
 export const get = app.query({
   access: "meetings.read",
   args: { code: s.string({ maxLength: 64 }) },
   returns: s.object({ meeting: MeetingOut, call: s.nullable(CallOut), peers: s.array(PeerOut), calls: s.integer(), now: s.number() }),
-  capability: { name: "meetings.get", description: "A meeting by code: its live call (if any) and who is in it right now, people and agents." },
+  capability: { name: "meetings.get", description: "A meeting by code: its live call (if any) and who is in it right now, people and agents. A meeting that was ended says so (closed), and refuses joins." },
   handler: async (ctx, { code }) => {
     const meeting = await meetingFor(ctx, code);
     const call = await latestCall(ctx, meeting.id);

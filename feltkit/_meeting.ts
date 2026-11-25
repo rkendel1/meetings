@@ -2,15 +2,15 @@
 import { fail } from "@feltdb/feltkit";
 import { calls, entries, meetings, orgAgents } from "./app.js";
 import { peers } from "./_presence.js";
-import { GRACE_MS, LIVE_MS, callState, endPeer, finishCall, isLive, settle, type CallState } from "./_presence.js";
-export { GRACE_MS, LIVE_MS, callState, endPeer, finishCall, isLive, settle, type CallState };
+import { GRACE_MS, IDLE_MS, IDLE_WARNING_MS, LIVE_MS, callState, endPeer, finishCall, isLive, noteActivity, settle, type CallState } from "./_presence.js";
+export { GRACE_MS, IDLE_MS, IDLE_WARNING_MS, LIVE_MS, callState, endPeer, finishCall, isLive, noteActivity, settle, type CallState };
 
 export const REACTIONS = ["👍", "👏", "😂", "🎉", "❤️", "🤔"] as const;
 
 type Principal = { id: string; type: string; displayName?: string };
 export type LeftReason = "left" | "replaced" | "expired" | "removed" | "ended" | "session-ended";
-export type Meeting = { id: string; code: string; title: string; hostId: string; hostName: string; access: "link" | "invited"; invited: string[]; agents?: "approved" | "open"; scheduledFor?: number; previousMeetingId?: string; createdAt: number };
-export type Call = { id: string; meetingId: string; number: number; startedAt: number; endedAt?: number; open?: boolean; recording?: { by: string; byName: string; startedAt: number; stoppedAt?: number } };
+export type Meeting = { id: string; code: string; title: string; hostId: string; hostName: string; access: "link" | "invited"; invited: string[]; agents?: "approved" | "open"; scheduledFor?: number; previousMeetingId?: string; closed?: boolean; closedAt?: number; closedByName?: string; createdAt: number };
+export type Call = { id: string; meetingId: string; number: number; startedAt: number; endedAt?: number; open?: boolean; recording?: { by: string; byName: string; startedAt: number; stoppedAt?: number }; lastActivityAt?: number; idleEndsAt?: number };
 export type Peer = { id: string; meetingId: string; callId: string; principalId: string; name: string; kind: "person" | "agent"; joinedAt: number; lastSeenAt: number; leftAt?: number; leftReason?: LeftReason; sessionRef?: string; signalWindowAt?: number; signalCount?: number; mic: boolean; cam: boolean; screen: boolean; hand: boolean };
 
 const LETTERS = "abcdefghijkmnopqrstuvwxyz";
@@ -45,6 +45,12 @@ export function isExternalAgent(p: { type: string; roles?: readonly string[] }):
   return p.type !== "user" && Array.isArray(p.roles) && p.roles.includes("agent");
 }
 
+/** An organization administrator: a person who holds the permission that guards branding and retention (the admin role). */
+export function isOrgAdmin(ctx: any): boolean {
+  const me = ctx.auth.requirePrincipal() as Principal;
+  return kindOf(me) === "person" && Boolean(ctx.auth.has?.("settings.write"));
+}
+
 /**
  * The organization decides which external agents attend its meetings: one that is not registered, or that an
  * administrator disabled, is refused everything here (as if no meeting existed), whoever invited it.
@@ -68,6 +74,12 @@ export async function meetingFor(ctx: any, code: string): Promise<Meeting> {
   const meeting = await byCode(ctx, code);
   if (!meeting || !mayAttend(meeting, me.id, kindOf(me))) fail("NOT_FOUND", "No meeting with that code, or you are not invited to it.");
   return meeting;
+}
+
+/** Nobody joins a closed meeting, and the answer says why: it ended, who ended it, and that the host can reopen it. */
+export function requireOpen(meeting: Meeting): void {
+  if (!meeting.closed) return;
+  fail("FAILED_PRECONDITION", `This meeting was ended${meeting.closedByName ? ` by ${meeting.closedByName}` : ""}. Its recap is still available, and the host can reopen it.`, { reason: "meeting-closed" });
 }
 
 export async function latestCall(ctx: any, meetingId: string): Promise<Call | null> {
