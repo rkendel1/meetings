@@ -33,6 +33,8 @@ export const observations = app.collection(
     bytes: s.integer({ minimum: 1 }),
     // The xeet artifact (its id hashes the whole document) and the capture context it covers, byte for byte.
     artifactId: s.string({ maxLength: 80 }),
+    // A derived artifact (a reader's annotation, e.g. OCR from xeet's macOS app) names the original it was derived from.
+    derivedFrom: s.optional(s.string({ maxLength: 80 })),
     artifact: s.string({ maxLength: 200_000 }),
     contextText: s.optional(s.string({ maxLength: 100_000 })),
     // xeet's projection of the artifact for a model that cannot see (representation.understand, consumer "text"): the
@@ -54,7 +56,7 @@ export const observations = app.collection(
   { indexes: [{ fields: ["meetingId"] }, { fields: ["sha256"] }] },
 );
 
-export type Observation = { id: string; meetingId: string; callId: string; entryId: string; fileId: string; sha256: string; mediaType: string; width: number; height: number; bytes: number; artifactId: string; artifact: string; contextText?: string; projection?: string; capturedAt: string; capturedById: string; capturedByName: string; method: string; mode: string; region?: { x: number; y: number; w: number; h: number }; surface?: { kind?: string; label?: string; url?: string }; caption?: string; replyToSeq?: number; createdAt: number };
+export type Observation = { id: string; meetingId: string; callId: string; entryId: string; fileId: string; sha256: string; mediaType: string; width: number; height: number; bytes: number; artifactId: string; derivedFrom?: string; artifact: string; contextText?: string; projection?: string; capturedAt: string; capturedById: string; capturedByName: string; method: string; mode: string; region?: { x: number; y: number; w: number; h: number }; surface?: { kind?: string; label?: string; url?: string }; caption?: string; replyToSeq?: number; createdAt: number };
 
 /** The running call the caller is visibly in: capturing into a meeting is something everyone in it sees. */
 async function liveCallOf(ctx: any, meeting: Meeting): Promise<string> {
@@ -135,7 +137,7 @@ export const add = app.action({
       fail("INVALID_ARGUMENT", "The capture context is not JSON.");
     }
     const frame = Array.isArray(context.frame) && context.frame.length === 4 ? context.frame : null;
-    const projection = String(JSON.parse((await xeetModule()).understand_artifact(args.artifact, JSON.stringify({ consumer: "text", maxChars: 12_000 }))).projection ?? "");
+    const projection = String(JSON.parse((await xeetModule()).understand_artifact(args.artifact, JSON.stringify({ consumer: "text", maxChars: 24_000 }))).projection ?? "");
     return ctx.runMutation({ name: "observations:record" } as never, {
       code: args.code,
       fileId: args.fileId,
@@ -145,6 +147,7 @@ export const add = app.action({
       height: Number(view?.pixelHeight ?? 1),
       bytes: bytes.byteLength,
       artifactId: String(document.id),
+      ...(typeof document.provenance?.derivedFrom === "string" ? { derivedFrom: document.provenance.derivedFrom.slice(0, 80) } : {}),
       artifact: args.artifact,
       ...(args.contextText ? { contextText: args.contextText } : {}),
       ...(projection ? { projection: projection.slice(0, 60_000) } : {}),
@@ -165,7 +168,7 @@ export const record = app.mutation({
   visibility: "internal",
   args: {
     code: s.string({ maxLength: 64 }), fileId: s.string(), sha256: s.string(), mediaType: s.string(), width: s.integer(), height: s.integer(), bytes: s.integer(),
-    artifactId: s.string(), artifact: s.string({ maxLength: 200_000 }), contextText: s.optional(s.string({ maxLength: 100_000 })), projection: s.optional(s.string({ maxLength: 60_000 })), capturedAt: s.string(), method: s.string(), mode: s.string(),
+    artifactId: s.string(), derivedFrom: s.optional(s.string()), artifact: s.string({ maxLength: 200_000 }), contextText: s.optional(s.string({ maxLength: 100_000 })), projection: s.optional(s.string({ maxLength: 60_000 })), capturedAt: s.string(), method: s.string(), mode: s.string(),
     region: s.optional(s.object({ x: s.number(), y: s.number(), w: s.number(), h: s.number() })),
     surface: s.optional(s.object({ kind: s.optional(s.string()), label: s.optional(s.string()), url: s.optional(s.string()) })),
     caption: s.optional(s.string({ maxLength: 500 })), replyToSeq: s.optional(s.integer({ minimum: 1 })),
@@ -187,13 +190,13 @@ export const record = app.mutation({
 
 const outFields = {
   id: s.string(), entryId: s.string(), sha256: s.string(), mediaType: s.string(), width: s.integer(), height: s.integer(), bytes: s.integer(),
-  artifactId: s.string(), capturedAt: s.string(), capturedById: s.string(), capturedByName: s.string(), method: s.string(), mode: s.string(),
+  artifactId: s.string(), derivedFrom: s.optional(s.string()), capturedAt: s.string(), capturedById: s.string(), capturedByName: s.string(), method: s.string(), mode: s.string(),
   region: s.optional(s.object({ x: s.number(), y: s.number(), w: s.number(), h: s.number() })),
   surface: s.optional(s.object({ kind: s.optional(s.string()), label: s.optional(s.string()), url: s.optional(s.string()) })),
   caption: s.optional(s.string()), replyToSeq: s.optional(s.integer()), createdAt: s.number(),
 };
 const ObservationOut = s.object(outFields);
-const out = (o: Observation) => ({ id: o.id, entryId: o.entryId, sha256: o.sha256, mediaType: o.mediaType, width: o.width, height: o.height, bytes: o.bytes, artifactId: o.artifactId, capturedAt: o.capturedAt, capturedById: o.capturedById, capturedByName: o.capturedByName, method: o.method, mode: o.mode, ...(o.region ? { region: o.region } : {}), ...(o.surface ? { surface: o.surface } : {}), ...(o.caption ? { caption: o.caption } : {}), ...(o.replyToSeq ? { replyToSeq: o.replyToSeq } : {}), createdAt: o.createdAt });
+const out = (o: Observation) => ({ id: o.id, entryId: o.entryId, sha256: o.sha256, mediaType: o.mediaType, width: o.width, height: o.height, bytes: o.bytes, artifactId: o.artifactId, ...(o.derivedFrom ? { derivedFrom: o.derivedFrom } : {}), capturedAt: o.capturedAt, capturedById: o.capturedById, capturedByName: o.capturedByName, method: o.method, mode: o.mode, ...(o.region ? { region: o.region } : {}), ...(o.surface ? { surface: o.surface } : {}), ...(o.caption ? { caption: o.caption } : {}), ...(o.replyToSeq ? { replyToSeq: o.replyToSeq } : {}), createdAt: o.createdAt });
 
 async function readable(ctx: any, o: Observation | null): Promise<Observation> {
   const me = ctx.auth.requirePrincipal();
@@ -234,7 +237,7 @@ export const get = app.query({
     const { bytes } = await ctx.services.files.read(o.fileId);
     const sha256 = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
     if (sha256 !== o.sha256) fail("DATA_LOSS" as never, "The stored image no longer matches the observation's digest.");
-    const projection = o.projection ?? String(JSON.parse((await xeetModule()).understand_artifact(o.artifact, JSON.stringify({ consumer: "text", maxChars: 12_000 }))).projection ?? "");
+    const projection = o.projection ?? String(JSON.parse((await xeetModule()).understand_artifact(o.artifact, JSON.stringify({ consumer: "text", maxChars: 24_000 }))).projection ?? "");
     return { ...out(o), imageBase64: Buffer.from(bytes).toString("base64"), artifact: o.artifact, ...(o.contextText ? { contextText: o.contextText } : {}), projection };
   },
 });

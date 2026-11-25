@@ -50,7 +50,9 @@ type Region = { x: number; y: number; w: number; h: number };
 export function CaptureDialog({ code, onClose, onError }: { code: string; onClose: () => void; onError: (e: unknown) => void }) {
   const client = useFeltKit();
   const prepare = useMutation(api.observations.prepare);
+  const [source, setSource] = useState<"screen" | "import" | null>(null);
   const [frame, setFrame] = useState<Frame | null>(null);
+  const [imported, setImported] = useState<{ artifact: string; contextText?: string; png: Uint8Array; title: string; src: string } | null>(null);
   const [region, setRegion] = useState<Region | null>(null);
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -58,11 +60,50 @@ export function CaptureDialog({ code, onClose, onError }: { code: string; onClos
   const drag = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
+    if (source !== "screen") return;
     void grabFrame().then(
       (f) => (setFrame(f), setRegion({ x: 0, y: 0, w: f.width, h: f.height })),
       (e) => (onError(e), onClose()),
     );
-  }, []);
+  }, [source]);
+
+  /**
+   * A capture made with xeet's macOS app (with Apple Vision OCR and the accessibility tree): the person picks its
+   * package folder (artifact.json and assets/), and the exact bytes it hashed are sent; the server verifies them.
+   */
+  const pickPackage = async (files: FileList | null) => {
+    try {
+      const list = [...(files ?? [])];
+      const doc = list.find((f) => f.name === "artifact.json");
+      const png = list.find((f) => /\.(png|jpe?g)$/i.test(f.name));
+      const ctx = list.find((f) => f.name !== "artifact.json" && f.name.endsWith(".json"));
+      if (!doc || !png) throw new Error("Choose a xeet capture's folder: it holds artifact.json and assets/ with the image.");
+      const artifact = await doc.text();
+      const parsed = JSON.parse(artifact);
+      if (parsed?.subject?.type !== "screenshot") throw new Error("That artifact is not a screenshot.");
+      const bytes = new Uint8Array(await png.arrayBuffer());
+      setImported({ artifact, ...(ctx ? { contextText: await ctx.text() } : {}), png: bytes, title: String(parsed.subject.title ?? "xeet capture"), src: URL.createObjectURL(png) });
+    } catch (e) {
+      onError(e);
+    }
+  };
+
+  const sendImported = async () => {
+    if (!imported) return;
+    try {
+      setBusy("Uploading…");
+      const link = await prepare({ code });
+      const put = await fetch(link.url, { method: "PUT", headers: { "content-type": "image/png", "x-file-name": "observation.png" }, body: new Blob([imported.png as BlobPart], { type: "image/png" }) });
+      const uploaded = await put.json();
+      if (!put.ok || !uploaded.ok) throw new Error(uploaded?.error?.message ?? `Upload failed (${put.status}).`);
+      setBusy("Verifying and sending…");
+      await client.action(api.observations.add, { code, fileId: uploaded.file.id, artifact: imported.artifact, ...(imported.contextText ? { contextText: imported.contextText } : {}), ...(caption.trim() ? { caption: caption.trim() } : {}) });
+      onClose();
+    } catch (e) {
+      onError(e);
+      setBusy(null);
+    }
+  };
 
   const toImage = (e: ReactPointerEvent) => {
     const img = shown.current!;
@@ -127,7 +168,26 @@ export function CaptureDialog({ code, onClose, onError }: { code: string; onClos
     <div className="modal-backdrop" role="dialog" aria-label="Send an observation">
       <div className="modal capture">
         <h3>Send what you see into the meeting</h3>
-        {!frame ? (
+        {source === null ? (
+          <div className="stack">
+            <button className="primary" onClick={() => setSource("screen")}>Capture a screen, window or tab</button>
+            <label className="secondary button-like">
+              Send a capture from xeet (macOS app)…
+              <input type="file" hidden multiple {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} onChange={(e) => (setSource("import"), void pickPackage(e.target.files))} />
+            </label>
+            <p className="small-text muted">xeet's macOS app adds what it read (Apple Vision text, the accessibility tree), so models that cannot see get it too, marked as inference. Choose the capture's folder (Show Capture Files → its artifact folder).</p>
+          </div>
+        ) : source === "import" ? (
+          imported ? (
+            <>
+              <img className="capture-preview" src={imported.src} alt={imported.title} />
+              <p className="small-text muted">{imported.title}</p>
+              <input value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={500} placeholder="What does it show? (optional)" aria-label="Caption" />
+            </>
+          ) : (
+            <p className="muted">Reading the capture…</p>
+          )
+        ) : !frame ? (
           <p className="muted">Choose a screen, window or tab in your browser's picker. One frame is taken; nothing is recorded.</p>
         ) : (
           <>
@@ -141,7 +201,7 @@ export function CaptureDialog({ code, onClose, onError }: { code: string; onClos
           </>
         )}
         <div className="row">
-          <button className="primary" disabled={!frame || !region || Boolean(busy)} onClick={() => void send()}>{busy ?? "Send to meeting"}</button>
+          {source !== null && <button className="primary" disabled={(source === "screen" ? !frame || !region : !imported) || Boolean(busy)} onClick={() => void (source === "screen" ? send() : sendImported())}>{busy ?? "Send to meeting"}</button>}
           <button className="secondary" disabled={Boolean(busy)} onClick={onClose}>Cancel</button>
         </div>
       </div>

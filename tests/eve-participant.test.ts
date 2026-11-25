@@ -6,7 +6,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { createTestApp } from "@feltdb/feltkit/testing";
@@ -248,6 +248,35 @@ test("Add Eve: the host adds an active organization agent; the outcome of starti
     assert.equal(after.meeting.invited.includes("eve"), false);
     assert.deepEqual(after.peers.map((p: any) => p.principalId), ["ada"]);
     await assert.rejects(t.as(eve).query(api.meetings.feed, { code: m.code }), (e: any) => code(e) === "NOT_FOUND");
+  } finally {
+    await t.close();
+  }
+});
+
+test("a xeet capture with OCR (as the macOS app writes it) is accepted as is: text-only models get the recognized text, marked inferred", async () => {
+  const t = await createTestApp();
+  await registerAgents(t);
+  try {
+    const dir = join(import.meta.dirname, "fixtures", "xeet-ocr-capture");
+    const artifact = readFileSync(join(dir, "artifact.json"), "utf8");
+    const doc = JSON.parse(artifact);
+    const assets = readdirSync(join(dir, "assets"));
+    const png = readFileSync(join(dir, "assets", assets.find((f) => f.endsWith(".png"))!));
+    const contextText = readFileSync(join(dir, "assets", assets.find((f) => f.endsWith(".json"))!), "utf8");
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "Invoices bug", access: "invited", invited: ["eve"] });
+    await t.as("ada").mutation(api.calls.join, { code: m.code });
+    await t.as(eve).mutation(api.calls.join, { code: m.code });
+    const link = await t.as("ada").mutation(api.observations.prepare, { code: m.code });
+    const file = await upload(t, link.url, png);
+    const recorded = await t.as("ada").action(api.observations.add, { code: m.code, fileId: file.id, artifact, contextText, caption: "The invoice list" });
+    assert.equal(recorded.artifactId, doc.id);
+    const got = await t.as(eve).query(api.observations.get, { id: recorded.id });
+    assert.equal(got.derivedFrom, doc.provenance.derivedFrom, "the OCR reading is a derived artifact of the original capture");
+    assert.equal(got.method, "screencapturekit");
+    assert.deepEqual(Buffer.from(got.imageBase64, "base64"), png, "vision models: the original pixels");
+    assert.match(got.projection, /ocr\.text "Text recognized by tesseract/, "text models: what the reader recognized");
+    assert.match(got.projection, /!inferred/, "marked as inference, never as fact");
+    assert.match(got.projection, /Invoices — Acme Billing/, "and the window and accessibility context the app observed");
   } finally {
     await t.close();
   }

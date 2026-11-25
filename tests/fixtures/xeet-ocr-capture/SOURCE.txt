@@ -1,0 +1,5 @@
+A xeet capture package with OCR, as the xeet capture pipeline writes it (the macOS app runs the same command with
+Apple Vision; this one was made on Linux with Tesseract 5.3.4):
+  xeet capture --image tests/fixtures/gateway/invoices.png --context tests/fixtures/capture/context-region-retina.json --ocr tesseract --store <dir>
+from rkendel1/xeet a9c056a+ . artifact.json is the derived artifact (OCR annotation, derivedFrom the original);
+assets/ holds the original image and the exact capture-context bytes both artifacts hash.

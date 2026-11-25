@@ -1,0 +1,1611 @@
+{
+  "assets": [
+    {
+      "bytes": 80956,
+      "mediaType": "image/png",
+      "path": "assets/15b81b83902b4c53bd08f121145633089af221c168fecfeaf267dcbe8cf86b9f.png",
+      "sha256": "sha256:15b81b83902b4c53bd08f121145633089af221c168fecfeaf267dcbe8cf86b9f"
+    },
+    {
+      "bytes": 1000,
+      "mediaType": "application/json",
+      "path": "assets/7350c964af9708246b7a400b0cdac8e9084e95d24eb1e0be9974104747886704.json",
+      "sha256": "sha256:7350c964af9708246b7a400b0cdac8e9084e95d24eb1e0be9974104747886704"
+    }
+  ],
+  "capabilities": [],
+  "capabilityPolicy": "descriptive-only",
+  "coverage": {
+    "bounds": "partial",
+    "capabilities": "not-applicable",
+    "provenance": "partial",
+    "reproduction": "supported",
+    "semantic": "not-supported",
+    "state": "partial",
+    "visual": "supported"
+  },
+  "format": "xeet-artifact",
+  "formatVersion": "0.1",
+  "id": "sha256:8ce75e1ac0f3c7ce654e2ba635d57ae02f8e4067e5384390083e9c893c4c38cf",
+  "limitations": {
+    "approximated": [],
+    "derived": [],
+    "inferred": [
+      {
+        "subject": "ocr",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.0",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.1",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.2",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.3",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.4",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.5",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.6",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.7",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.8",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.9",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.10",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.11",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.12",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      },
+      {
+        "subject": "ocr.line.13",
+        "what": "content read from pixels, not supplied by the source",
+        "why": "read by xeet-ocr:tesseract 5.3.4+52ceafa165ef (tesseract 5.3.4 on linux; config sha256 1cf8e75ff9524ca5855c98d0dcbb32079005d95257d0d27fbd6310f338715408) at 2026-11-25T18:22:05Z"
+      }
+    ],
+    "omitted": [
+      {
+        "subject": "image",
+        "what": "the image's content (text, objects, values, layout) as fact",
+        "why": "this adapter identifies and measures images and does not interpret pixels; a reader (OCR, a vision model) may add text and positions, always as inference (see limitations.inferred)"
+      }
+    ],
+    "unverified": [
+      {
+        "subject": "ax",
+        "what": "the accessibility tree",
+        "why": "it is what the application reported through the platform's accessibility API, a separate source from the pixels; the two can disagree"
+      },
+      {
+        "what": "where the image came from",
+        "why": "the caller supplied the bytes; their origin is not established"
+      }
+    ]
+  },
+  "provenance": {
+    "adapter": {
+      "name": "xeet-capture/image",
+      "version": "0.1.1"
+    },
+    "authenticity": "unverified",
+    "capture": {
+      "capturedAt": "2026-11-25T18:22:05Z",
+      "capturedBy": {
+        "name": "Xeet Capture",
+        "version": "0.1.0"
+      },
+      "method": "screencapturekit"
+    },
+    "derivedFrom": "sha256:8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+    "inputs": [
+      {
+        "asset": "sha256:15b81b83902b4c53bd08f121145633089af221c168fecfeaf267dcbe8cf86b9f",
+        "role": "source-image"
+      },
+      {
+        "asset": "sha256:7350c964af9708246b7a400b0cdac8e9084e95d24eb1e0be9974104747886704",
+        "role": "capture-context"
+      }
+    ],
+    "source": {
+      "timestamps": {},
+      "type": "screen",
+      "version": "macOS 15.1 (24B83)"
+    },
+    "transformations": [
+      {
+        "deterministic": true,
+        "inputs": [
+          "sha256:15b81b83902b4c53bd08f121145633089af221c168fecfeaf267dcbe8cf86b9f"
+        ],
+        "outputs": [
+          "semantic",
+          "views.v0"
+        ],
+        "step": "identify-and-measure (magic bytes, header dimensions)",
+        "tool": {
+          "name": "xeet-capture/image",
+          "version": "0.1.1"
+        }
+      },
+      {
+        "at": "2026-11-25T18:22:05Z",
+        "deterministic": false,
+        "inputs": [
+          "sha256:15b81b83902b4c53bd08f121145633089af221c168fecfeaf267dcbe8cf86b9f"
+        ],
+        "outputs": [
+          "ocr",
+          "ocr.line.0",
+          "ocr.line.1",
+          "ocr.line.2",
+          "ocr.line.3",
+          "ocr.line.4",
+          "ocr.line.5",
+          "ocr.line.6",
+          "ocr.line.7",
+          "ocr.line.8",
+          "ocr.line.9",
+          "ocr.line.10",
+          "ocr.line.11",
+          "ocr.line.12",
+          "ocr.line.13"
+        ],
+        "step": "annotate (inferred content)",
+        "tool": {
+          "name": "xeet-ocr:tesseract",
+          "version": "5.3.4+52ceafa165ef"
+        }
+      }
+    ]
+  },
+  "semantic": {
+    "elements": [
+      {
+        "attrs": {
+          "capture.frame": [
+            -1800.0,
+            100.0,
+            240.0,
+            178.0
+          ],
+          "capture.method": "screencapturekit",
+          "capture.mode": "region",
+          "image.bytes": 80956,
+          "image.declaredName": "invoices.png",
+          "image.format": "image/png",
+          "image.height": 356,
+          "image.width": 480
+        },
+        "basis": "observed",
+        "bounds": [
+          {
+            "h": 356.0,
+            "view": "v0",
+            "w": 480.0,
+            "x": 0.0,
+            "y": 0.0
+          }
+        ],
+        "children": [
+          "capture.display",
+          "capture.window",
+          "ax",
+          "ocr"
+        ],
+        "id": "image",
+        "kind": "media",
+        "role": "image.file",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "capture.displayFrame": [
+            -1920.0,
+            0.0,
+            1920.0,
+            1080.0
+          ],
+          "capture.displayId": 2,
+          "capture.scale": 2.0
+        },
+        "basis": "observed",
+        "id": "capture.display",
+        "kind": "group",
+        "role": "capture.display",
+        "text": "Studio Display",
+        "visible": false
+      },
+      {
+        "attrs": {
+          "capture.app": {
+            "bundleId": "com.apple.Safari",
+            "name": "Safari",
+            "pid": null
+          },
+          "capture.windowFrame": [
+            -1820.0,
+            60.0,
+            900.0,
+            700.0
+          ],
+          "capture.windowId": 77
+        },
+        "basis": "observed",
+        "id": "capture.window",
+        "kind": "identity",
+        "role": "capture.window",
+        "text": "Invoices — Acme Billing",
+        "visible": false
+      },
+      {
+        "attrs": {
+          "ax.clipped": true,
+          "ax.frame": [
+            -1820.0,
+            60.0,
+            900.0,
+            700.0
+          ],
+          "ax.role": "AXWindow"
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 356.0,
+            "view": "v0",
+            "w": 480.0,
+            "x": 0.0,
+            "y": 0.0
+          }
+        ],
+        "children": [
+          "ax.0",
+          "ax.1"
+        ],
+        "id": "ax",
+        "kind": "group",
+        "role": "ax.Window",
+        "text": "Invoices — Acme Billing",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ax.frame": [
+            -1000.0,
+            100.0,
+            60.0,
+            20.0
+          ],
+          "ax.role": "AXButton"
+        },
+        "basis": "source",
+        "id": "ax.1",
+        "kind": "affordance",
+        "role": "ax.Button",
+        "text": "Export",
+        "visible": false
+      },
+      {
+        "attrs": {
+          "ax.frame": [
+            -1792.0,
+            122.0,
+            40.0,
+            12.0
+          ],
+          "ax.role": "AXHeading"
+        },
+        "basis": "source",
+        "bounds": [
+          {
+            "h": 24.0,
+            "view": "v0",
+            "w": 80.0,
+            "x": 16.0,
+            "y": 44.0
+          }
+        ],
+        "id": "ax.0",
+        "kind": "heading",
+        "role": "ax.Heading",
+        "text": "Invoices",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.engine": {
+            "config": {
+              "leptonica": "1.82.0",
+              "oem": "default",
+              "output": "tsv",
+              "psm": 3,
+              "threads": 1
+            },
+            "formats": [
+              "image/png",
+              "image/jpeg",
+              "image/gif",
+              "image/webp",
+              "image/tiff"
+            ],
+            "languages": [
+              "eng"
+            ],
+            "name": "tesseract",
+            "platform": "linux",
+            "unsupported": [
+              "orientation detection (page segmentation mode 3 assumes upright text)",
+              "handwriting"
+            ],
+            "version": "5.3.4"
+          },
+          "ocr.lines": 14,
+          "ocr.orientation": "up",
+          "ocr.readingOrder": "engine-layout",
+          "ocr.uncertainLines": 5
+        },
+        "basis": "inferred",
+        "children": [
+          "ocr.line.0",
+          "ocr.line.1",
+          "ocr.line.2",
+          "ocr.line.3",
+          "ocr.line.4",
+          "ocr.line.5",
+          "ocr.line.6",
+          "ocr.line.7",
+          "ocr.line.8",
+          "ocr.line.9",
+          "ocr.line.10",
+          "ocr.line.11",
+          "ocr.line.12",
+          "ocr.line.13"
+        ],
+        "id": "ocr",
+        "kind": "list",
+        "role": "ocr.text",
+        "text": "Text recognized by tesseract 5.3.4 (eng): 14 lines, 5 uncertain",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0333,
+            0.0253,
+            0.3208,
+            0.0787
+          ],
+          "ocr.confidence": 0.8197,
+          "ocr.order": 0,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.words": [
+            {
+              "box": [
+                0.0333,
+                0.0534,
+                0.0708,
+                0.0253
+              ],
+              "confidence": 0.8197,
+              "text": "‘Acme"
+            },
+            {
+              "box": [
+                0.1125,
+                0.0506,
+                0.0854,
+                0.0365
+              ],
+              "confidence": 0.9325,
+              "text": "Billing"
+            },
+            {
+              "box": [
+                0.1938,
+                0.0253,
+                0.0125,
+                0.0787
+              ],
+              "confidence": 0.9213,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.2083,
+                0.0506,
+                0.1458,
+                0.0281
+              ],
+              "confidence": 0.9598,
+              "text": "Receivables"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 28.015625,
+            "view": "v0",
+            "w": 153.984375,
+            "x": 15.984375,
+            "y": 9.015625
+          }
+        ],
+        "id": "ocr.line.0",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "‘Acme Billing - Receivables",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0354,
+            0.1348,
+            0.1625,
+            0.0421
+          ],
+          "ocr.confidence": 0.9654,
+          "ocr.order": 1,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.words": [
+            {
+              "box": [
+                0.0354,
+                0.1348,
+                0.1625,
+                0.0421
+              ],
+              "confidence": 0.9654,
+              "text": "Invoices"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 14.984375,
+            "view": "v0",
+            "w": 78.0,
+            "x": 16.984375,
+            "y": 47.984375
+          }
+        ],
+        "id": "ocr.line.1",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "Invoices",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0333,
+            0.2051,
+            0.3521,
+            0.0787
+          ],
+          "ocr.confidence": 0.7976,
+          "ocr.order": 2,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.words": [
+            {
+              "box": [
+                0.0333,
+                0.2331,
+                0.0271,
+                0.0253
+              ],
+              "confidence": 0.8293,
+              "text": "As"
+            },
+            {
+              "box": [
+                0.0729,
+                0.2303,
+                0.0229,
+                0.0281
+              ],
+              "confidence": 0.958,
+              "text": "of"
+            },
+            {
+              "box": [
+                0.1042,
+                0.2331,
+                0.1375,
+                0.0253
+              ],
+              "confidence": 0.8162,
+              "text": "2026-11-16"
+            },
+            {
+              "box": [
+                0.2479,
+                0.2051,
+                0.025,
+                0.0787
+              ],
+              "confidence": 0.7976,
+              "text": "-5"
+            },
+            {
+              "box": [
+                0.2854,
+                0.2303,
+                0.1,
+                0.0281
+              ],
+              "confidence": 0.8444,
+              "text": "invoices"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 28.015625,
+            "view": "v0",
+            "w": 169.015625,
+            "x": 15.984375,
+            "y": 73.015625
+          }
+        ],
+        "id": "ocr.line.2",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "As of 2026-11-16 -5 invoices",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0354,
+            0.3258,
+            0.625,
+            0.0787
+          ],
+          "ocr.confidence": 0.5962,
+          "ocr.order": 3,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.uncertain": "low-confidence words: \"Due\" 0.60, \"-\" 0.60",
+          "ocr.words": [
+            {
+              "box": [
+                0.0354,
+                0.3455,
+                0.1208,
+                0.0337
+              ],
+              "confidence": 0.8823,
+              "text": "Invoice"
+            },
+            {
+              "box": [
+                0.1521,
+                0.3258,
+                0.0125,
+                0.0787
+              ],
+              "confidence": 0.8382,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.1667,
+                0.3483,
+                0.1458,
+                0.0309
+              ],
+              "confidence": 0.876,
+              "text": "Customer"
+            },
+            {
+              "box": [
+                0.3208,
+                0.3624,
+                0.0063,
+                0.0084
+              ],
+              "confidence": 0.7062,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.3354,
+                0.3483,
+                0.1354,
+                0.0309
+              ],
+              "confidence": 0.8956,
+              "text": "Amount"
+            },
+            {
+              "box": [
+                0.4646,
+                0.3258,
+                0.0104,
+                0.0787
+              ],
+              "confidence": 0.7067,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.4813,
+                0.3483,
+                0.0729,
+                0.0309
+              ],
+              "confidence": 0.5962,
+              "text": "Due"
+            },
+            {
+              "box": [
+                0.5417,
+                0.3258,
+                0.0104,
+                0.0787
+              ],
+              "confidence": 0.5962,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.5646,
+                0.3483,
+                0.0958,
+                0.0309
+              ],
+              "confidence": 0.8919,
+              "text": "Status"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 28.015625,
+            "view": "v0",
+            "w": 300.0,
+            "x": 16.984375,
+            "y": 115.984375
+          }
+        ],
+        "id": "ocr.line.3",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "Invoice - Customer - Amount - Due - Status",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0354,
+            0.4185,
+            0.55,
+            0.0365
+          ],
+          "ocr.confidence": 0.8412,
+          "ocr.order": 4,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.words": [
+            {
+              "box": [
+                0.0354,
+                0.4213,
+                0.1167,
+                0.0281
+              ],
+              "confidence": 0.8836,
+              "text": "INV-1041"
+            },
+            {
+              "box": [
+                0.1625,
+                0.4354,
+                0.0042,
+                0.0056
+              ],
+              "confidence": 0.8618,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.1771,
+                0.4185,
+                0.1375,
+                0.0309
+              ],
+              "confidence": 0.9695,
+              "text": "Northwind"
+            },
+            {
+              "box": [
+                0.325,
+                0.4185,
+                0.0979,
+                0.0309
+              ],
+              "confidence": 0.8412,
+              "text": "Traders"
+            },
+            {
+              "box": [
+                0.4333,
+                0.4354,
+                0.0042,
+                0.0056
+              ],
+              "confidence": 0.8412,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.4479,
+                0.4185,
+                0.1375,
+                0.0365
+              ],
+              "confidence": 0.9414,
+              "text": "$1,200.00"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 12.984375,
+            "view": "v0",
+            "w": 264.0,
+            "x": 16.984375,
+            "y": 148.984375
+          }
+        ],
+        "id": "ocr.line.4",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "INV-1041 - Northwind Traders - $1,200.00",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0354,
+            0.441,
+            0.3292,
+            0.0787
+          ],
+          "ocr.confidence": 0.8296,
+          "ocr.order": 5,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.words": [
+            {
+              "box": [
+                0.0354,
+                0.4691,
+                0.0479,
+                0.0253
+              ],
+              "confidence": 0.9335,
+              "text": "Due"
+            },
+            {
+              "box": [
+                0.0917,
+                0.4691,
+                0.1458,
+                0.0253
+              ],
+              "confidence": 0.8296,
+              "text": "2026-10-01"
+            },
+            {
+              "box": [
+                0.2458,
+                0.441,
+                0.0104,
+                0.0787
+              ],
+              "confidence": 0.8296,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.2625,
+                0.4663,
+                0.1021,
+                0.0281
+              ],
+              "confidence": 0.9518,
+              "text": "Overdue"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 28.015625,
+            "view": "v0",
+            "w": 158.015625,
+            "x": 16.984375,
+            "y": 157.0
+          }
+        ],
+        "id": "ocr.line.5",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "Due 2026-10-01 - Overdue",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0354,
+            0.5309,
+            0.4479,
+            0.0337
+          ],
+          "ocr.confidence": 0.2256,
+          "ocr.order": 6,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.uncertain": "low-confidence words: \"-\" 0.23",
+          "ocr.words": [
+            {
+              "box": [
+                0.0354,
+                0.5337,
+                0.1229,
+                0.0281
+              ],
+              "confidence": 0.9221,
+              "text": "INV-1042"
+            },
+            {
+              "box": [
+                0.1688,
+                0.5478,
+                0.0042,
+                0.0056
+              ],
+              "confidence": 0.2256,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.1813,
+                0.5337,
+                0.1125,
+                0.0281
+              ],
+              "confidence": 0.9288,
+              "text": "Contoso"
+            },
+            {
+              "box": [
+                0.3042,
+                0.5309,
+                0.0375,
+                0.0309
+              ],
+              "confidence": 0.7681,
+              "text": "Ltd"
+            },
+            {
+              "box": [
+                0.3521,
+                0.5478,
+                0.0042,
+                0.0056
+              ],
+              "confidence": 0.7681,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.3667,
+                0.5309,
+                0.1167,
+                0.0337
+              ],
+              "confidence": 0.9657,
+              "text": "$480.00"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 12.0,
+            "view": "v0",
+            "w": 214.984375,
+            "x": 16.984375,
+            "y": 189.0
+          }
+        ],
+        "id": "ocr.line.6",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "INV-1042 - Contoso Ltd - $480.00",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0354,
+            0.5534,
+            0.2875,
+            0.0787
+          ],
+          "ocr.confidence": 0.8494,
+          "ocr.order": 7,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.words": [
+            {
+              "box": [
+                0.0354,
+                0.5815,
+                0.0479,
+                0.0253
+              ],
+              "confidence": 0.9362,
+              "text": "Due"
+            },
+            {
+              "box": [
+                0.0917,
+                0.5815,
+                0.1438,
+                0.0253
+              ],
+              "confidence": 0.9139,
+              "text": "2026-11-30"
+            },
+            {
+              "box": [
+                0.2458,
+                0.5534,
+                0.0104,
+                0.0787
+              ],
+              "confidence": 0.8494,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.2583,
+                0.5815,
+                0.0646,
+                0.0309
+              ],
+              "confidence": 0.9662,
+              "text": "Open"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 28.015625,
+            "view": "v0",
+            "w": 138.0,
+            "x": 16.984375,
+            "y": 197.015625
+          }
+        ],
+        "id": "ocr.line.7",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "Due 2026-11-30 - Open",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0354,
+            0.6208,
+            0.4813,
+            0.0787
+          ],
+          "ocr.confidence": 0.7033,
+          "ocr.order": 8,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.words": [
+            {
+              "box": [
+                0.0354,
+                0.6461,
+                0.1229,
+                0.0281
+              ],
+              "confidence": 0.9192,
+              "text": "INV-1043"
+            },
+            {
+              "box": [
+                0.1688,
+                0.6601,
+                0.0042,
+                0.0056
+              ],
+              "confidence": 0.7033,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.1833,
+                0.6433,
+                0.1208,
+                0.0309
+              ],
+              "confidence": 0.9033,
+              "text": "Fabrikam"
+            },
+            {
+              "box": [
+                0.3146,
+                0.6461,
+                0.05,
+                0.0281
+              ],
+              "confidence": 0.7109,
+              "text": "Inc"
+            },
+            {
+              "box": [
+                0.3563,
+                0.6208,
+                0.0125,
+                0.0787
+              ],
+              "confidence": 0.7109,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.375,
+                0.6433,
+                0.1417,
+                0.0365
+              ],
+              "confidence": 0.9665,
+              "text": "$2,950.00"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 28.015625,
+            "view": "v0",
+            "w": 231.015625,
+            "x": 16.984375,
+            "y": 221.0
+          }
+        ],
+        "id": "ocr.line.8",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "INV-1043 - Fabrikam Inc - $2,950.00",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0354,
+            0.6657,
+            0.3333,
+            0.0787
+          ],
+          "ocr.confidence": 0.4922,
+          "ocr.order": 9,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.uncertain": "low-confidence words: \"-\" 0.49",
+          "ocr.words": [
+            {
+              "box": [
+                0.0354,
+                0.6938,
+                0.0479,
+                0.0253
+              ],
+              "confidence": 0.9502,
+              "text": "Due"
+            },
+            {
+              "box": [
+                0.0917,
+                0.6938,
+                0.15,
+                0.0253
+              ],
+              "confidence": 0.7938,
+              "text": "2026-09-15"
+            },
+            {
+              "box": [
+                0.25,
+                0.6657,
+                0.0104,
+                0.0787
+              ],
+              "confidence": 0.4922,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.2646,
+                0.6938,
+                0.1042,
+                0.0253
+              ],
+              "confidence": 0.9465,
+              "text": "Overdue"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 28.015625,
+            "view": "v0",
+            "w": 159.984375,
+            "x": 16.984375,
+            "y": 236.984375
+          }
+        ],
+        "id": "ocr.line.9",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "Due 2026-09-15 - Overdue",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0354,
+            0.7556,
+            0.45,
+            0.0393
+          ],
+          "ocr.confidence": 0.39,
+          "ocr.order": 10,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.uncertain": "low-confidence words: \"INV-1044\" 0.39",
+          "ocr.words": [
+            {
+              "box": [
+                0.0354,
+                0.7584,
+                0.125,
+                0.0281
+              ],
+              "confidence": 0.39,
+              "text": "INV-1044"
+            },
+            {
+              "box": [
+                0.1708,
+                0.7725,
+                0.0042,
+                0.0056
+              ],
+              "confidence": 0.7417,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.1833,
+                0.7556,
+                0.1,
+                0.0393
+              ],
+              "confidence": 0.928,
+              "text": "Tailspin"
+            },
+            {
+              "box": [
+                0.2917,
+                0.7584,
+                0.0604,
+                0.0365
+              ],
+              "confidence": 0.8891,
+              "text": "Toys"
+            },
+            {
+              "box": [
+                0.3625,
+                0.7725,
+                0.0042,
+                0.0056
+              ],
+              "confidence": 0.8891,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.3771,
+                0.7556,
+                0.1083,
+                0.0337
+              ],
+              "confidence": 0.9024,
+              "text": "$130.00"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 13.984375,
+            "view": "v0",
+            "w": 216.0,
+            "x": 16.984375,
+            "y": 268.984375
+          }
+        ],
+        "id": "ocr.line.10",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "INV-1044 - Tailspin Toys - $130.00",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0354,
+            0.7781,
+            0.2708,
+            0.0815
+          ],
+          "ocr.confidence": 0.8256,
+          "ocr.order": 11,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.words": [
+            {
+              "box": [
+                0.0354,
+                0.8062,
+                0.0479,
+                0.0253
+              ],
+              "confidence": 0.9512,
+              "text": "Due"
+            },
+            {
+              "box": [
+                0.0917,
+                0.8062,
+                0.1375,
+                0.0253
+              ],
+              "confidence": 0.9063,
+              "text": "2026-11-01"
+            },
+            {
+              "box": [
+                0.2375,
+                0.7781,
+                0.0063,
+                0.0815
+              ],
+              "confidence": 0.8256,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.2563,
+                0.8034,
+                0.05,
+                0.0281
+              ],
+              "confidence": 0.9541,
+              "text": "Paid"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 29.015625,
+            "view": "v0",
+            "w": 129.984375,
+            "x": 16.984375,
+            "y": 277.0
+          }
+        ],
+        "id": "ocr.line.11",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "Due 2026-11-01 - Paid",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0354,
+            0.8455,
+            0.4521,
+            0.0815
+          ],
+          "ocr.confidence": 0.7537,
+          "ocr.order": 12,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.words": [
+            {
+              "box": [
+                0.0354,
+                0.8708,
+                0.1375,
+                0.0281
+              ],
+              "confidence": 0.7537,
+              "text": "INV-1045"
+            },
+            {
+              "box": [
+                0.1625,
+                0.8455,
+                0.0125,
+                0.0815
+              ],
+              "confidence": 0.7663,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.1833,
+                0.868,
+                0.1,
+                0.0393
+              ],
+              "confidence": 0.9302,
+              "text": "Wingtip"
+            },
+            {
+              "box": [
+                0.2917,
+                0.8708,
+                0.0729,
+                0.0365
+              ],
+              "confidence": 0.8682,
+              "text": "Toys"
+            },
+            {
+              "box": [
+                0.3625,
+                0.8455,
+                0.0083,
+                0.0815
+              ],
+              "confidence": 0.8682,
+              "text": "-"
+            },
+            {
+              "box": [
+                0.375,
+                0.868,
+                0.1125,
+                0.0337
+              ],
+              "confidence": 0.8176,
+              "text": "$760.00"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 29.015625,
+            "view": "v0",
+            "w": 217.015625,
+            "x": 16.984375,
+            "y": 301.0
+          }
+        ],
+        "id": "ocr.line.12",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "INV-1045 - Wingtip Toys - $760.00",
+        "visible": true
+      },
+      {
+        "attrs": {
+          "ocr.boxNormalized": [
+            0.0354,
+            0.9157,
+            0.3,
+            0.0281
+          ],
+          "ocr.confidence": 0.3679,
+          "ocr.order": 13,
+          "ocr.source": "artifact://sha256/8c831eec6738155c5e30da8cfa735e24adde9ab8d610a597ab4a62015b6e8bbe",
+          "ocr.uncertain": "low-confidence words: \"2026-10-20\" 0.44, \"Overd,\" 0.37",
+          "ocr.words": [
+            {
+              "box": [
+                0.0354,
+                0.9185,
+                0.0479,
+                0.0253
+              ],
+              "confidence": 0.9611,
+              "text": "Due"
+            },
+            {
+              "box": [
+                0.0917,
+                0.9185,
+                0.15,
+                0.0253
+              ],
+              "confidence": 0.4371,
+              "text": "2026-10-20"
+            },
+            {
+              "box": [
+                0.2646,
+                0.9157,
+                0.0708,
+                0.0281
+              ],
+              "confidence": 0.3679,
+              "text": "Overd,"
+            }
+          ]
+        },
+        "basis": "inferred",
+        "bounds": [
+          {
+            "h": 10.0,
+            "view": "v0",
+            "w": 144.0,
+            "x": 16.984375,
+            "y": 325.984375
+          }
+        ],
+        "id": "ocr.line.13",
+        "kind": "text",
+        "role": "ocr.line",
+        "text": "Due 2026-10-20 Overd,",
+        "visible": true
+      }
+    ],
+    "relations": [],
+    "root": "image"
+  },
+  "state": {
+    "asOf": "2026-11-25T18:22:05Z",
+    "facts": [
+      {
+        "basis": "observed",
+        "key": "sha256",
+        "subject": "image",
+        "value": "sha256:15b81b83902b4c53bd08f121145633089af221c168fecfeaf267dcbe8cf86b9f",
+        "volatile": false
+      },
+      {
+        "basis": "observed",
+        "key": "format",
+        "subject": "image",
+        "value": "image/png",
+        "volatile": false
+      },
+      {
+        "basis": "observed",
+        "key": "pixelSize",
+        "subject": "image",
+        "value": [
+          480,
+          356
+        ],
+        "volatile": false
+      },
+      {
+        "basis": "observed",
+        "key": "captureMode",
+        "subject": "image",
+        "value": "region",
+        "volatile": false
+      },
+      {
+        "basis": "observed",
+        "key": "platform",
+        "subject": "image",
+        "value": "macOS 15.1 (24B83)",
+        "volatile": false
+      },
+      {
+        "basis": "observed",
+        "key": "permission.accessibility",
+        "subject": "image",
+        "value": "granted",
+        "volatile": true
+      },
+      {
+        "basis": "observed",
+        "key": "permission.screenRecording",
+        "subject": "image",
+        "value": "granted",
+        "volatile": true
+      }
+    ],
+    "temporal": "historical-observation"
+  },
+  "subject": {
+    "element": "image",
+    "title": "screenshot of Safari: Invoices — Acme Billing (480x356)",
+    "type": "screenshot"
+  },
+  "views": [
+    {
+      "asset": "sha256:15b81b83902b4c53bd08f121145633089af221c168fecfeaf267dcbe8cf86b9f",
+      "config": {
+        "original": true
+      },
+      "fidelity": {
+        "claim": "original",
+        "evidence": "the view asset is the input asset (same sha256)",
+        "target": "the source image itself"
+      },
+      "id": "v0",
+      "layoutHeight": 356.0,
+      "layoutWidth": 480.0,
+      "mediaType": "image/png",
+      "pixelHeight": 356,
+      "pixelWidth": 480,
+      "renderer": {
+        "name": "none: the view is the source bytes",
+        "version": ""
+      },
+      "scale": 1.0
+    }
+  ]
+}

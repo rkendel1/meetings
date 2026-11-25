@@ -232,3 +232,5 @@ ul.hits li { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .agent-card { border: 1px solid rgba(127, 127, 127, 0.35); border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; }
 .agent-card ul { margin: 0; padding-left: 18px; }
 .agent-card-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.capture-preview { max-width: 100%; border-radius: 6px; }
+label.button-like { display: inline-flex; justify-content: center; padding: 8px 14px; border-radius: 8px; cursor: pointer; border: 1px solid rgba(127, 127, 127, 0.45); }
