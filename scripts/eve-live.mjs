@@ -28,8 +28,9 @@ const beat = setInterval(() => ada.mutation(fn("calls:heartbeat"), { peerId: a2.
 const wait = async (pred, ms) => { const end = Date.now() + ms; let after = 0; const seen = []; while (Date.now() < end) { const f = await ada.query(fn("meetings:feed"), { code: now.code, after }); after = f.next; for (const e of f.entries) { seen.push(e); console.log(`  [${e.kind}] ${e.authorName}${e.authorKind === "agent" ? " (agent)" : ""}: ${e.text.slice(0, 600)}`); } const hit = seen.find(pred); if (hit) return hit; await new Promise((r) => setTimeout(r, 2000)); } return null; };
 const joined = await wait((e) => e.authorId === "eve" && e.kind === "chat", 150000);
 console.log("EVE JOINED", Boolean(joined));
-await ada.mutation(fn("chat:send"), { code: now.code, text: "Eve, what did we decide in the previous meeting, and what is still open?" });
-const answer = await wait((e) => e.authorId === "eve" && e.kind === "chat", 240000);
+const asked = await ada.mutation(fn("chat:send"), { code: now.code, text: "Eve, what did we decide in the previous meeting, and what is still open?" });
+const askedSeq = (await ada.query(fn("meetings:feed"), { code: now.code, after: 0 })).entries.find((e) => e.id === asked.id).seq;
+const answer = await wait((e) => e.authorId === "eve" && e.kind === "chat" && e.seq > askedSeq, 240000);
 console.log("EVE ANSWERED", Boolean(answer));
 clearInterval(beat);
 process.exit(0);
