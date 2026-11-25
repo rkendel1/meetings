@@ -808,8 +808,9 @@ function AgentsPanel({ code, agents, access, policy, isHost, onError }: { code: 
   const steps = useMemo(
     () => [
       { label: "1. Give the agent an identity (in the project folder; prints a token)", cmd: `npx feltkit session create --type agent --id claude --role agent` },
-      { label: "2. Connect it over MCP (Claude Code shown; any MCP client works)", cmd: `claude mcp add --transport http meetings ${origin}/mcp --header "Authorization: Bearer <token>"` },
-      { label: "3. Ask it to attend", cmd: `Join meeting ${code} with meetings_join, follow what is said with meetings_feed (pass the returned next as after), answer in chat with chat_send, and record decisions with decisions_add and action items with actions_add (assignee, dueAt), and save a summary with summaries_save when we wrap up; use search_find to look up earlier meetings. Call meetings_join again every 20 seconds to stay present.` },
+      { label: "2. Ask an administrator to register that id as one of the organization's agents (orgagents.register, principal id claude). Until it is registered, every call the agent makes is refused with \"not one of this organization's active agents\", even if the host invited it.", cmd: "" },
+      { label: "3. Connect it over MCP (Claude Code shown; any MCP client works)", cmd: `claude mcp add --transport http meetings ${origin}/mcp --header "Authorization: Bearer <token>"` },
+      { label: "4. Ask it to attend", cmd: `Join meeting ${code} with meetings_join, follow what is said with meetings_feed (pass the returned next as after), answer in chat with chat_send, and record decisions with decisions_add and action items with actions_add (assignee, dueAt), and save a summary with summaries_save when we wrap up; use search_find to look up earlier meetings. Call meetings_join again every 20 seconds to stay present.` },
     ],
     [origin, code],
   );
@@ -820,12 +821,12 @@ function AgentsPanel({ code, agents, access, policy, isHost, onError }: { code: 
         <p className="small-text">
           {agents.length ? `${agents.map((a) => a.name).join(", ")} ${agents.length === 1 ? "is" : "are"} attending.` : "No agents are attending."} Agents join as participants without media: they read the live transcript and chat, post messages, and leave notes for the recap. They never keep a call open on their own.
         </p>
-        {(access === "invited" || policy === "approved") && <p className="small-text warn-text">The host approves agents: add the agent's id (e.g. <code>claude</code>) to the invited ids in People, or allow any agent with the link.</p>}
+        {(access === "invited" || policy === "approved") && <p className="small-text warn-text">Once an administrator has registered the agent, the host approves it for this meeting: add the agent's id (e.g. <code>claude</code>) to the invited ids in People, or allow any agent with the link. Registration is required either way.</p>}
         {steps.map((s) => (
           <div key={s.label} className="stack">
             <span className="small-text muted">{s.label}</span>
-            <code className="block">{s.cmd}</code>
-            <button className="secondary small" onClick={() => void navigator.clipboard?.writeText(s.cmd)}>Copy</button>
+            {s.cmd && <code className="block">{s.cmd}</code>}
+            {s.cmd && <button className="secondary small" onClick={() => void navigator.clipboard?.writeText(s.cmd)}>Copy</button>}
           </div>
         ))}
         <p className="small-text muted">In production, issue an API key (Studio → Services → API keys); keys hold the agent role. MCP tools the agent gets: meetings_*, chat_send, chat_react, notes_add, actions_add/update/list, decisions_add/list, summaries_save/get, search_find, inbox_list.</p>
