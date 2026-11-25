@@ -281,3 +281,22 @@ test("a xeet capture with OCR (as the macOS app writes it) is accepted as is: te
     await t.close();
   }
 });
+
+test("a full-screen capture larger than 1 MiB is accepted (up to 10 MB)", async () => {
+  const t = await createTestApp();
+  await registerAgents(t);
+  try {
+    const x = await xeet();
+    // A real PNG followed by 3 MB of padding: still identified as PNG by its header, and well over the old 1 MiB limit.
+    const big = Buffer.concat([PNG, Buffer.alloc(3 * 1024 * 1024)]);
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "Big capture", access: "invited", invited: [] });
+    await t.as("ada").mutation(api.calls.join, { code: m.code });
+    const built = JSON.parse(x.capture_screenshot(big, captureRequest()));
+    const link = await t.as("ada").mutation(api.observations.prepare, { code: m.code });
+    const file = await upload(t, link.url, big);
+    const recorded = await t.as("ada").action(api.observations.add, { code: m.code, fileId: file.id, artifact: built.documentText, contextText: built.contextText });
+    assert.equal(recorded.created, true);
+  } finally {
+    await t.close();
+  }
+});

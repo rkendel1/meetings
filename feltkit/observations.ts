@@ -16,6 +16,7 @@ import { fail, s } from "@feltdb/feltkit";
 import { app, meetings } from "./app.js";
 import { append, callState, latestCall, meetingFor, kindOf, nameOf, type Meeting, requireStanding } from "./_meeting.js";
 import { mayReadRecords } from "./_records.js";
+import { notifyAgents } from "./orgagents.js";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -184,6 +185,7 @@ export const record = app.mutation({
     const name = nameOf(me);
     const entryId = await append(ctx, meeting, { callId, kind: "observation", text: `${name} shared an observation (${o.width}×${o.height})${o.caption ? `: ${o.caption}` : ""}` });
     const id = await ctx.db.insert(observations, { meetingId: meeting.id, callId, entryId, ...o, capturedById: me.id, capturedByName: name, createdAt: Date.now() });
+    await notifyAgents(ctx, meeting.id);
     return { id, entryId, sha256: o.sha256, artifactId: o.artifactId, created: true };
   },
 });

@@ -56,13 +56,15 @@ export const app = feltkit({
     notifications: { types: ["meeting.invited", "actionitem.assigned", "actionitem.due", "recap.ready"] },
     // The sweep (feltkit/maintenance.ts) ends calls nobody is writing to, sends due reminders and applies the
     // retention policy. An admin schedules it once: Studio → Services → Schedules, job type maintenance.sweep.
-    jobs: { handlers: { "maintenance.sweep": "maintenance:sweep" } },
+    // agents.notify (feltkit/orgagents.ts): deliver what was just said or shown to a running organization agent.
+    jobs: { handlers: { "maintenance.sweep": "maintenance:sweep", "agents.notify": "orgagents:notify" } },
     schedules: true,
     configuration: true,
     // Observations (feltkit/observations.ts): a participant's screen captures, kept as the original bytes. files.read
     // and files.write in the roles above only let this app's own functions reach the bytes: FeltKit publishes no file
     // capability to callers, and observations.get authorizes each read against the meeting (mayReadRecords) first.
-    files: true,
+    // A full-screen capture on a Retina display is several MB; FeltKit's default limit is 1 MiB.
+    files: { maxBytes: 10 * 1024 * 1024 },
     // An API key holds the agent role: that is how an agent outside this machine attends.
     apiKeys: { roles: ["agent"] },
     intelligence: true,
@@ -89,6 +91,9 @@ export const orgAgents = app.collection(
     // How the agent's execution is started when a host adds it to a meeting: "eve" is the Eve application
     // (integration `eve` below). Without one, adding the agent only invites it.
     connector: s.optional(s.enum(["eve"] as const)),
+    // The work grant the agent's application issued to this organization's Meetings (a reference, not a secret): named
+    // in every call, so that application authorizes each join or leave under it.
+    connectorGrant: s.optional(s.string({ maxLength: 120 })),
     registeredById: s.string(),
     registeredByName: s.string(),
     registeredAt: s.number(),
@@ -111,6 +116,8 @@ export const agentParticipation = app.collection(
     sessionId: s.optional(s.string({ maxLength: 120 })),
     detail: s.optional(s.string({ maxLength: 500 })),
     removedAt: s.optional(s.number()),
+    // The last timeline entry delivered to the agent's running session (orgagents:notify).
+    notifiedSeq: s.optional(s.integer()),
   },
   { indexes: [{ fields: ["meetingId"] }] },
 );
@@ -211,27 +218,44 @@ export const turn = app.integration("turn", {
  * (`credential-ref:eve`; in production `FELTKIT_CREDENTIAL_EVE`), which may only ask Eve to join or leave a meeting.
  * What Eve may do there comes from the organization's delegation in the Eve application, never from this key.
  */
-const EveJoined = s.object({ ok: s.boolean(), value: s.object({ sessionId: s.string(), created: s.boolean() }) });
+const AppPortRequest = {
+  protocol: s.literal("appport/1"),
+  type: s.literal("request"),
+  requestId: s.string(),
+  capability: s.object({ name: s.string(), version: s.integer() }),
+  invocation: s.object({ grantRef: s.string() }),
+  idempotencyKey: s.optional(s.string()),
+};
+const AppPortResponse = s.object({ ok: s.boolean(), output: s.optional(s.unknown()), error: s.optional(s.object({ code: s.string(), message: s.string() })) });
 export const eveApp = app.integration("eve", {
-  description: "The organization's Eve application: start or end Eve's work for a meeting.",
+  description: "The organization's Eve application: start or end Eve's work for a meeting (AppPort, under the grant it issued to this Meetings).",
   baseUrl: { env: "EVE_APP_URL", development: "http://127.0.0.1:3300" },
   credential: "credential-ref:eve",
   timeoutMs: 15000,
   operations: {
     join: {
       method: "POST",
-      path: "/api/capability/eve.meetings.join",
-      input: { input: s.object({ code: s.string(), title: s.string(), requestedBy: s.object({ id: s.string(), name: s.string() }) }), idempotencyKey: s.string() },
-      output: EveJoined,
+      path: "/appport",
+      input: { ...AppPortRequest, input: s.object({ code: s.string(), title: s.string(), requestedBy: s.object({ id: s.string(), name: s.string() }) }) },
+      output: AppPortResponse,
       effect: "consequential",
       access: "agents.add",
       expose: false, // only through orgagents:add, which checks the host and the organization's registry
     },
+    notify: {
+      method: "POST",
+      path: "/appport",
+      input: { ...AppPortRequest, input: s.object({ code: s.string(), entries: s.array(s.object({ seq: s.integer(), kind: s.string(), from: s.string(), fromKind: s.string(), text: s.string() })) }) },
+      output: AppPortResponse,
+      effect: "consequential",
+      access: "agents.add",
+      expose: false,
+    },
     leave: {
       method: "POST",
-      path: "/api/capability/eve.meetings.leave",
-      input: { input: s.object({ code: s.string() }) },
-      output: s.object({ ok: s.boolean(), value: s.object({ ended: s.boolean() }) }),
+      path: "/appport",
+      input: { ...AppPortRequest, input: s.object({ code: s.string() }) },
+      output: AppPortResponse,
       effect: "consequential",
       access: "agents.add",
       expose: false,
