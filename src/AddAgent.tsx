@@ -10,6 +10,15 @@ import { api } from "../feltkit/_generated/api";
 
 const STATUS: Record<string, string> = { invited: "Invited", started: "Running · joining the meeting", failed: "Could not start", removed: "Removed" };
 
+/** Being invited is not enough: the server refuses every agent the organization has not registered (feltkit/_meeting.ts requireStanding). */
+function RegistrationNote() {
+  return (
+    <p className="small-text warn-text">
+      An agent can attend only if an administrator has registered its id as one of this organization's agents. Listing an id in People, or opening the meeting to agents, does not register it: an unregistered agent is refused with "not one of this organization's active agents". Ask an administrator to register it first (it then appears here).
+    </p>
+  );
+}
+
 export function OrgAgents({ code, isHost, onError }: { code: string; isHost: boolean; onError: (e: unknown) => void }) {
   const agents = useQueryState(api.orgagents.forMeeting, { code });
   const client = useFeltKit();
@@ -26,9 +35,15 @@ export function OrgAgents({ code, isHost, onError }: { code: string; isHost: boo
     }
   };
   const list = (agents.data ?? []).filter((a: any) => a.status === "active");
-  if (!list.length) return <p className="small-text muted">This organization has no active agents. An administrator registers them.</p>;
+  if (!list.length) return (
+    <div className="stack">
+      <p className="small-text muted">This organization has no active agents. An administrator registers them.</p>
+      <RegistrationNote />
+    </div>
+  );
   return (
     <div className="stack">
+      <RegistrationNote />
       {list.map((a: any) => {
         const here = a.participation && a.participation.status !== "removed";
         return (
