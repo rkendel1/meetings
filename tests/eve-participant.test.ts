@@ -209,3 +209,41 @@ test("observations: a present person's capture, verified against the stored byte
     await t.close();
   }
 });
+
+test("Add Eve: the host adds an active organization agent; the outcome of starting its execution is recorded, never assumed", async () => {
+  const t = await createTestApp();
+  try {
+    await t.as("ada").mutation(api.orgagents.register, { principalId: "eve", name: "Eve", purpose: "Engineering teammate", operatedBy: "Platform team", connector: "eve" });
+    await t.as("ada").mutation(api.orgagents.register, { principalId: "helper", name: "Helper" });
+    await t.as("ada").mutation(api.orgagents.setStatus, { principalId: "helper", status: "disabled" });
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "Triage", access: "invited", invited: ["grace"] });
+    await t.as("ada").mutation(api.calls.join, { code: m.code });
+
+    await assert.rejects(t.as("grace").action(api.orgagents.add, { code: m.code, principalId: "eve" }), (e: any) => code(e) === "FORBIDDEN");
+    await assert.rejects(t.as("ada").action(api.orgagents.add, { code: m.code, principalId: "helper" }), (e: any) => code(e) === "FAILED_PRECONDITION");
+
+    // No Eve application is connected in this test: Eve is invited, and the record says her execution did not start, and why.
+    const added = await t.as("ada").action(api.orgagents.add, { code: m.code, principalId: "eve" });
+    assert.equal(added.status, "failed");
+    assert.match(added.detail!, /[A-Z_]+: /);
+    const here = await t.as("grace").query(api.orgagents.forMeeting, { code: m.code });
+    const eveHere = here.find((a: any) => a.principalId === "eve")!;
+    assert.equal(eveHere.participation?.status, "failed");
+    assert.equal(eveHere.participation?.addedByName, "Ada Lovelace");
+    const meeting = await t.as("ada").query(api.meetings.get, { code: m.code });
+    assert.ok(meeting.meeting.invited.includes("eve"));
+    await t.as(eve).mutation(api.calls.join, { code: m.code });
+    const feed = await t.as("ada").query(api.meetings.feed, { code: m.code });
+    assert.ok(feed.entries.some((e: any) => e.kind === "system" && e.text === "Ada Lovelace added Eve (an agent of this organization)"));
+
+    // Removing her: no longer invited, out of the call.
+    const removed = await t.as("ada").action(api.orgagents.remove, { code: m.code, principalId: "eve" });
+    assert.equal(removed.status, "removed");
+    const after = await t.as("ada").query(api.meetings.get, { code: m.code });
+    assert.equal(after.meeting.invited.includes("eve"), false);
+    assert.deepEqual(after.peers.map((p: any) => p.principalId), ["ada"]);
+    await assert.rejects(t.as(eve).query(api.meetings.feed, { code: m.code }), (e: any) => code(e) === "NOT_FOUND");
+  } finally {
+    await t.close();
+  }
+});

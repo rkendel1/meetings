@@ -220,3 +220,15 @@ button.round.danger { background: #d92d20; color: #fff; width: 58px; border-radi
 ul.plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 ul.hits li { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .chat-form { flex-wrap: wrap; }
+
+/* Observations (src/Observe.tsx) and organization agents (src/AddAgent.tsx) */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: grid; place-items: center; z-index: 50; padding: 16px; }
+.modal.capture { background: var(--panel, #1b1b1f); color: inherit; border-radius: 12px; padding: 16px; width: min(960px, 100%); max-height: 92vh; overflow: auto; display: grid; gap: 10px; }
+.capture-frame { position: relative; user-select: none; touch-action: none; cursor: crosshair; }
+.capture-frame img { display: block; width: 100%; height: auto; border-radius: 6px; }
+.capture-region { position: absolute; outline: 2px solid #4f8cff; background: rgba(79, 140, 255, 0.15); pointer-events: none; }
+.observation figure { margin: 6px 0 0; }
+.observation img { max-width: 100%; border-radius: 6px; border: 1px solid rgba(127, 127, 127, 0.35); }
+.agent-card { border: 1px solid rgba(127, 127, 127, 0.35); border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; }
+.agent-card ul { margin: 0; padding-left: 18px; }
+.agent-card-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

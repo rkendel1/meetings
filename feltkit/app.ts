@@ -15,7 +15,7 @@ export const app = feltkit({
   description: "Video meetings that people and agents attend together: chat, reactions, live captions, recaps.",
   roles: {
     // People: create meetings, join calls (media + signaling), chat, captions, notes.
-    member: ["meetings.*", "agents.read", "observations.*", "files.read", "files.write", "chat.*", "captions.*", "notes.*", "signal.*", "media.*", "notifications.*", "actions.*", "decisions.*", "summaries.*", "search.*", "recording.*", "ai.*", "feltkit.agent.*"],
+    member: ["meetings.*", "agents.read", "agents.add", "observations.*", "files.read", "files.write", "chat.*", "captions.*", "notes.*", "signal.*", "media.*", "notifications.*", "actions.*", "decisions.*", "summaries.*", "search.*", "recording.*", "ai.*", "feltkit.agent.*"],
     // Agents: see meetings they may attend, attend (presence only, no media), read the timeline,
     // chat, react, and leave notes for the recap. They cannot create meetings, host, or caption.
     // They also keep the meeting's records (action items, decisions, summaries) and research past meetings.
@@ -86,6 +86,9 @@ export const orgAgents = app.collection(
     // Where the agent executes and who answers for it, as the organization describes it (shown to participants).
     operatedBy: s.optional(s.string({ maxLength: 200 })),
     status: s.enum(["active", "disabled"] as const),
+    // How the agent's execution is started when a host adds it to a meeting: "eve" is the Eve application
+    // (integration `eve` below). Without one, adding the agent only invites it.
+    connector: s.optional(s.enum(["eve"] as const)),
     registeredById: s.string(),
     registeredByName: s.string(),
     registeredAt: s.number(),
@@ -93,6 +96,23 @@ export const orgAgents = app.collection(
     changedAt: s.optional(s.number()),
   },
   { unique: [["principalId"]] },
+);
+
+/** An organization agent in one meeting: who added it, and whether its execution started (or why not). */
+export const agentParticipation = app.collection(
+  "agentParticipation",
+  {
+    meetingId: s.ref("meetings"),
+    principalId: s.string(),
+    addedById: s.string(),
+    addedByName: s.string(),
+    addedAt: s.number(),
+    status: s.enum(["invited", "started", "failed", "removed"] as const),
+    sessionId: s.optional(s.string({ maxLength: 120 })),
+    detail: s.optional(s.string({ maxLength: 500 })),
+    removedAt: s.optional(s.number()),
+  },
+  { indexes: [{ fields: ["meetingId"] }] },
 );
 
 /** When housekeeping last ran (feltkit/agents.ts, the janitor): one record. */
@@ -181,6 +201,40 @@ export const turn = app.integration("turn", {
       readOnly: true,
       access: "media.ice",
       expose: false, // only through media:iceServers, which checks the caller is in a live call
+    },
+  },
+});
+
+/**
+ * The Eve application, as this organization's connector for Eve: starting her execution for a meeting when a host adds
+ * her, and ending it when she is removed. Meetings calls it with its own API key for that application
+ * (`credential-ref:eve`; in production `FELTKIT_CREDENTIAL_EVE`), which may only ask Eve to join or leave a meeting.
+ * What Eve may do there comes from the organization's delegation in the Eve application, never from this key.
+ */
+const EveJoined = s.object({ ok: s.boolean(), value: s.object({ sessionId: s.string(), created: s.boolean() }) });
+export const eveApp = app.integration("eve", {
+  description: "The organization's Eve application: start or end Eve's work for a meeting.",
+  baseUrl: { env: "EVE_APP_URL", development: "http://127.0.0.1:3300" },
+  credential: "credential-ref:eve",
+  timeoutMs: 15000,
+  operations: {
+    join: {
+      method: "POST",
+      path: "/api/capability/eve.meetings.join",
+      input: { input: s.object({ code: s.string(), title: s.string(), requestedBy: s.object({ id: s.string(), name: s.string() }) }), idempotencyKey: s.string() },
+      output: EveJoined,
+      effect: "consequential",
+      access: "agents.add",
+      expose: false, // only through orgagents:add, which checks the host and the organization's registry
+    },
+    leave: {
+      method: "POST",
+      path: "/api/capability/eve.meetings.leave",
+      input: { input: s.object({ code: s.string() }) },
+      output: s.object({ ok: s.boolean(), value: s.object({ ended: s.boolean() }) }),
+      effect: "consequential",
+      access: "agents.add",
+      expose: false,
     },
   },
 });
