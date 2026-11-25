@@ -4,6 +4,7 @@ import { ThemeToggle } from "./theme";
 import { ResetForm, SignedOut } from "./auth";
 import { Home } from "./Home";
 import { Call } from "./Call";
+import { MeetingFrame } from "./MeetingFrame";
 import { Recap } from "./Recap";
 import { Settings } from "./Settings";
 import { DEMO, PERSONAS, chosenPersona, signInAsPersona } from "./demo";
@@ -122,7 +123,9 @@ export function App() {
       ) : !principal ? (
         <SignedOut brand={brand} devUsers={session.devUsers} accounts={session.accounts ?? null} onDevSignIn={(id) => signInAsDevUser(id).catch(report)} onSignIn={signIn} onSignUp={signUp} />
       ) : route.page === "call" ? (
-        <Call key={`${route.code}:${principal.id}`} code={route.code} me={{ id: principal.id, name: principal.displayName ?? principal.id }} onError={report} />
+        <MeetingFrame key={`${route.code}:${principal.id}`} code={route.code} me={{ id: principal.id, name: principal.displayName ?? principal.id }} isAdmin={isAdmin} onError={report}>
+          <Call code={route.code} me={{ id: principal.id, name: principal.displayName ?? principal.id }} onError={report} />
+        </MeetingFrame>
       ) : route.page === "settings" ? (
         isAdmin ? <Settings onError={report} /> : <div className="center muted">Settings are for administrators.</div>
       ) : route.page === "recap" ? (

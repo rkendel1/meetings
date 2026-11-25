@@ -54,7 +54,7 @@ export const app = feltkit({
   },
   services: {
     notifications: { types: ["meeting.invited", "actionitem.assigned", "actionitem.due", "recap.ready"] },
-    // The sweep (feltkit/maintenance.ts) ends calls nobody is writing to, sends due reminders and applies the
+    // The sweep (feltkit/maintenance.ts) ends calls nobody is writing to, reminds owners, and applies the
     // retention policy. An admin schedules it once: Studio → Services → Schedules, job type maintenance.sweep.
     // agents.notify (feltkit/orgagents.ts): deliver what was just said or shown to a running organization agent.
     jobs: { handlers: { "maintenance.sweep": "maintenance:sweep", "agents.notify": "orgagents:notify" } },
@@ -141,6 +141,11 @@ export const meetings = app.collection(
     scheduledFor: s.optional(s.number()),
     // The meeting this one continues, set by the host (never inferred): "what did we decide last time" reads it.
     previousMeetingId: s.optional(s.string()),
+    // Closed by "End meeting" (feltkit/meetings.ts endMeeting): nobody may join until the host reopens it. Everything
+    // it kept stays. `closed` is the state; who and when are kept for the page that tells people it ended.
+    closed: s.optional(s.boolean()),
+    closedAt: s.optional(s.number()),
+    closedByName: s.optional(s.string()),
     createdAt: s.number(),
   },
   { unique: [["code"]], indexes: [{ fields: ["hostId"] }] },
@@ -159,6 +164,10 @@ export const calls = app.collection(
     // The latest recording of this call. Recording is the host's browser capturing the call (feltkit/recording.ts);
     // everyone sees that it is on, and the call keeps who started it and when.
     recording: s.optional(s.object({ by: s.string(), byName: s.string(), startedAt: s.number(), stoppedAt: s.optional(s.number()) })),
+    // The last time a person showed activity (feltkit/_presence.ts noteActivity); the call's start until then. Agents never set it.
+    lastActivityAt: s.optional(s.number()),
+    // While the "Still here?" prompt is showing: when the call ends unless a person shows activity. 0 or absent: no prompt.
+    idleEndsAt: s.optional(s.number()),
   },
   { unique: [["meetingId", "number"]], indexes: [{ fields: ["meetingId"] }, { fields: ["open"] }] },
 );

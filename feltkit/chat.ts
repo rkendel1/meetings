@@ -1,21 +1,23 @@
 import { fail, s } from "@feltdb/feltkit";
-import { app } from "./app.js";
-import { REACTIONS, append, callState, latestCall, meetingFor, ownPeer, type Meeting } from "./_meeting.js";
+import { app, calls } from "./app.js";
+import { REACTIONS, append, callState, kindOf, latestCall, meetingFor, noteActivity, ownPeer, type Call, type Meeting } from "./_meeting.js";
 import { notifyAgents } from "./orgagents.js";
 
 const Posted = s.object({ id: s.string() });
 
 /**
  * The running call a message belongs to. Posting into a running call needs presence in it (or being
- * the host): nobody speaks into a call without being seen in it.
+ * the host): nobody speaks into a call without being seen in it. A person posting is activity (an agent never is).
  */
 async function openCallId(ctx: any, meeting: Meeting): Promise<string | undefined> {
   const call = await latestCall(ctx, meeting.id);
   if (!call || call.endedAt !== undefined) return undefined;
-  const state = await callState(ctx, call, Date.now());
+  const now = Date.now();
+  const state = await callState(ctx, call, now);
   if (!state.open) return undefined;
   const me = ctx.auth.requirePrincipal();
   if (meeting.hostId !== me.id && !state.live.some((p) => p.principalId === me.id)) fail("FORBIDDEN", "Join the call to post in it.");
+  if (kindOf(me) === "person") await noteActivity(ctx, call, now);
   return call.id;
 }
 
@@ -48,7 +50,7 @@ export const react = app.mutation({
   },
 });
 
-/** A finished caption line from the speaker's own browser (speech recognition runs there). People only. */
+/** A finished caption line from the speaker's own browser (speech recognition runs there). People only. Speech is activity. */
 export const caption = app.mutation({
   access: "captions.write",
   args: { peerId: s.string(), code: s.string(), text: s.string({ minLength: 1, maxLength: 2000 }) },
@@ -58,6 +60,8 @@ export const caption = app.mutation({
     const meeting = await meetingFor(ctx, code);
     const peer = await ownPeer(ctx, peerId);
     if (peer.meetingId !== meeting.id || peer.kind !== "person") fail("FORBIDDEN", "Only a person in this call captions their own speech.");
+    const call = (await ctx.db.get(calls, peer.callId)) as Call | null;
+    if (call) await noteActivity(ctx, call, Date.now());
     return { id: await append(ctx, meeting, { callId: peer.callId, kind: "caption", text: text.trim(), author: { id: peer.principalId, name: peer.name, kind: "person" } }) };
   },
 });
