@@ -186,6 +186,11 @@ test("observations: a present person's capture, verified against the stored byte
     assert.equal(got.mode, "region");
     assert.equal(got.surface?.label, "Chrome tab: Invoices");
     assert.equal(JSON.parse(x.verify_screenshot(got.artifact, Buffer.from(got.imageBase64, "base64"), got.contextText)).ok, true, "Eve can verify it herself");
+    // A model that cannot see gets xeet's projection of the same artifact: the capture's metadata with its basis.
+    assert.match(got.projection, /SUBJECT screenshot/);
+    assert.match(got.projection, /capture\.mode":"region"/);
+    assert.match(got.projection, /Chrome tab: Invoices/);
+    assert.match(got.projection, /\[visual-only\]/, "and is told plainly what exists only in the pixels");
     // Grace is invited but not in the running call: like the timeline, she cannot read it until the call ends.
     await assert.rejects(t.as("grace").query(api.observations.get, { id: recorded.id }), (e: any) => code(e) === "NOT_FOUND");
 

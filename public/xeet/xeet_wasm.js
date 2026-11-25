@@ -186,6 +186,47 @@ export function resolve_links(url, options, host) {
 }
 
 /**
+ * The artifact as a model that cannot see reads it: xeet's projection
+ * (`representation.understand`), the same one its gateway hands a
+ * text-only model. Each statement keeps its basis (from the source,
+ * observed, derived, inferred, unknown). `request` is `{ consumer:
+ * "text" | "vision", maxChars?, maxText?, sections?, focus?, depth?,
+ * format?: "text" | "json" }`. Returns `{ projection, delivery }`.
+ * @param {string} document
+ * @param {string} request
+ * @returns {string}
+ */
+export function understand_artifact(document, request) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        let ptr0, len0, ptr1, len1;
+        try {
+            ptr0 = passStringToWasm0(document, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len0 = WASM_VECTOR_LEN;
+            ptr1 = passStringToWasm0(request, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len1 = WASM_VECTOR_LEN;
+        } catch (e) {
+            if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+            if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 1, 1); }
+            throw e;
+        }
+        const ret = wasm.understand_artifact(ptr0, len0, ptr1, len1);
+        var ptr3 = ret[0];
+        var len3 = ret[1];
+        if (ret[3]) {
+            ptr3 = 0; len3 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+    }
+}
+
+/**
  * @returns {string}
  */
 export function upstream_version() {
@@ -435,7 +476,7 @@ function __wbg_get_imports() {
             return ret;
         },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 870, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 879, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_86072e8c5cf0a02b___convert__closures_____invoke___wasm_bindgen_86072e8c5cf0a02b___JsValue__core_7d5f0a2ba6a62c33___result__Result_____wasm_bindgen_86072e8c5cf0a02b___JsError___true_);
             return ret;
         },

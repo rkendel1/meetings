@@ -35,6 +35,9 @@ export const observations = app.collection(
     artifactId: s.string({ maxLength: 80 }),
     artifact: s.string({ maxLength: 200_000 }),
     contextText: s.optional(s.string({ maxLength: 100_000 })),
+    // xeet's projection of the artifact for a model that cannot see (representation.understand, consumer "text"): the
+    // capture's metadata, geometry and any readings, each with its basis. Computed by the server from the verified artifact.
+    projection: s.optional(s.string({ maxLength: 60_000 })),
     capturedAt: s.string({ maxLength: 40 }),
     capturedById: s.string(),
     capturedByName: s.string(),
@@ -51,7 +54,7 @@ export const observations = app.collection(
   { indexes: [{ fields: ["meetingId"] }, { fields: ["sha256"] }] },
 );
 
-export type Observation = { id: string; meetingId: string; callId: string; entryId: string; fileId: string; sha256: string; mediaType: string; width: number; height: number; bytes: number; artifactId: string; artifact: string; contextText?: string; capturedAt: string; capturedById: string; capturedByName: string; method: string; mode: string; region?: { x: number; y: number; w: number; h: number }; surface?: { kind?: string; label?: string; url?: string }; caption?: string; replyToSeq?: number; createdAt: number };
+export type Observation = { id: string; meetingId: string; callId: string; entryId: string; fileId: string; sha256: string; mediaType: string; width: number; height: number; bytes: number; artifactId: string; artifact: string; contextText?: string; projection?: string; capturedAt: string; capturedById: string; capturedByName: string; method: string; mode: string; region?: { x: number; y: number; w: number; h: number }; surface?: { kind?: string; label?: string; url?: string }; caption?: string; replyToSeq?: number; createdAt: number };
 
 /** The running call the caller is visibly in: capturing into a meeting is something everyone in it sees. */
 async function liveCallOf(ctx: any, meeting: Meeting): Promise<string> {
@@ -78,7 +81,7 @@ export const prepare = app.mutation({
   },
 });
 
-let xeet: { verify_screenshot(document: string, image: Uint8Array, context: string | undefined): string } | null = null;
+let xeet: { verify_screenshot(document: string, image: Uint8Array, context: string | undefined): string; understand_artifact(document: string, request: string): string } | null = null;
 async function xeetModule() {
   if (!xeet) {
     const dir = join(process.cwd(), "public", "xeet");
@@ -132,6 +135,7 @@ export const add = app.action({
       fail("INVALID_ARGUMENT", "The capture context is not JSON.");
     }
     const frame = Array.isArray(context.frame) && context.frame.length === 4 ? context.frame : null;
+    const projection = String(JSON.parse((await xeetModule()).understand_artifact(args.artifact, JSON.stringify({ consumer: "text", maxChars: 12_000 }))).projection ?? "");
     return ctx.runMutation({ name: "observations:record" } as never, {
       code: args.code,
       fileId: args.fileId,
@@ -143,6 +147,7 @@ export const add = app.action({
       artifactId: String(document.id),
       artifact: args.artifact,
       ...(args.contextText ? { contextText: args.contextText } : {}),
+      ...(projection ? { projection: projection.slice(0, 60_000) } : {}),
       capturedAt: String(document.provenance?.capture?.capturedAt ?? ""),
       method: String(context.method || document.provenance?.capture?.method || "unknown").slice(0, 60),
       mode: String(context.mode || "unknown").slice(0, 20),
@@ -160,7 +165,7 @@ export const record = app.mutation({
   visibility: "internal",
   args: {
     code: s.string({ maxLength: 64 }), fileId: s.string(), sha256: s.string(), mediaType: s.string(), width: s.integer(), height: s.integer(), bytes: s.integer(),
-    artifactId: s.string(), artifact: s.string({ maxLength: 200_000 }), contextText: s.optional(s.string({ maxLength: 100_000 })), capturedAt: s.string(), method: s.string(), mode: s.string(),
+    artifactId: s.string(), artifact: s.string({ maxLength: 200_000 }), contextText: s.optional(s.string({ maxLength: 100_000 })), projection: s.optional(s.string({ maxLength: 60_000 })), capturedAt: s.string(), method: s.string(), mode: s.string(),
     region: s.optional(s.object({ x: s.number(), y: s.number(), w: s.number(), h: s.number() })),
     surface: s.optional(s.object({ kind: s.optional(s.string()), label: s.optional(s.string()), url: s.optional(s.string()) })),
     caption: s.optional(s.string({ maxLength: 500 })), replyToSeq: s.optional(s.integer({ minimum: 1 })),
@@ -217,14 +222,19 @@ export const list = app.query({
 export const get = app.query({
   access: "observations.read",
   args: { id: s.string() },
-  returns: s.object({ ...outFields, imageBase64: s.string(), artifact: s.string(), contextText: s.optional(s.string()) }),
-  capability: { name: "observations.get", description: "An observation's original image (base64, the captured bytes unchanged), its metadata and its xeet artifact (digest, capture context). The image is evidence of what was on screen; what you conclude from it is your own statement, not part of the observation." },
+  returns: s.object({ ...outFields, imageBase64: s.string(), artifact: s.string(), contextText: s.optional(s.string()), projection: s.string() }),
+  capability: {
+    name: "observations.get",
+    description:
+      "An observation, for vision and text-only models alike: the original image (imageBase64, the captured bytes unchanged) for a model that can see, and `projection`, xeet's machine-readable text of the same artifact (capture method, region, surface, size, digest, and any readings, each marked with its basis: observed, derived, inferred, unknown) for a model that cannot. Content marked [visual-only] exists only in the pixels. `artifact` is the full xeet document. The observation is evidence of what was on screen; what you conclude from it is your own statement, not part of it.",
+  },
   handler: async (ctx, { id }) => {
     await requireStanding(ctx);
     const o = await readable(ctx, (await ctx.db.get(observations, id)) as Observation | null);
     const { bytes } = await ctx.services.files.read(o.fileId);
     const sha256 = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
     if (sha256 !== o.sha256) fail("DATA_LOSS" as never, "The stored image no longer matches the observation's digest.");
-    return { ...out(o), imageBase64: Buffer.from(bytes).toString("base64"), artifact: o.artifact, ...(o.contextText ? { contextText: o.contextText } : {}) };
+    const projection = o.projection ?? String(JSON.parse((await xeetModule()).understand_artifact(o.artifact, JSON.stringify({ consumer: "text", maxChars: 12_000 }))).projection ?? "");
+    return { ...out(o), imageBase64: Buffer.from(bytes).toString("base64"), artifact: o.artifact, ...(o.contextText ? { contextText: o.contextText } : {}), projection };
   },
 });

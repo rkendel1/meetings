@@ -60,6 +60,16 @@ export function resolve(input: string, options: string, host: any): Promise<any>
  */
 export function resolve_links(url: string, options: string, host: any): Promise<any>;
 
+/**
+ * The artifact as a model that cannot see reads it: xeet's projection
+ * (`representation.understand`), the same one its gateway hands a
+ * text-only model. Each statement keeps its basis (from the source,
+ * observed, derived, inferred, unknown). `request` is `{ consumer:
+ * "text" | "vision", maxChars?, maxText?, sections?, focus?, depth?,
+ * format?: "text" | "json" }`. Returns `{ projection, delivery }`.
+ */
+export function understand_artifact(document: string, request: string): string;
+
 export function upstream_version(): string;
 
 /**
@@ -81,6 +91,7 @@ export interface InitOutput {
     readonly register_font: (a: number, b: number, c: number, d: number) => [number, number];
     readonly resolve: (a: number, b: number, c: number, d: number, e: any) => any;
     readonly resolve_links: (a: number, b: number, c: number, d: number, e: any) => any;
+    readonly understand_artifact: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly upstream_version: () => [number, number];
     readonly verify_screenshot: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
     readonly wasm_bindgen_86072e8c5cf0a02b___convert__closures_____invoke___js_sys_7363a54b283313f8___Function_fn_wasm_bindgen_86072e8c5cf0a02b___JsValue_____wasm_bindgen_86072e8c5cf0a02b___sys__Undefined___js_sys_7363a54b283313f8___Function_fn_wasm_bindgen_86072e8c5cf0a02b___JsValue_____wasm_bindgen_86072e8c5cf0a02b___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
