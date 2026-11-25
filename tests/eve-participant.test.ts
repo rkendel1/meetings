@@ -300,3 +300,36 @@ test("a full-screen capture larger than 1 MiB is accepted (up to 10 MB)", async 
     await t.close();
   }
 });
+
+test("browser OCR: a separate artifact derived from the capture; text models read it as inferred; the original is kept as is", async () => {
+  const t = await createTestApp();
+  await registerAgents(t);
+  try {
+    const x = await xeet();
+    const tsv = readFileSync(join(import.meta.dirname, "fixtures", "invoices-tesseract-5.3.4.tsv"), "utf8");
+    const engine = { name: "tesseract", version: "5.1.0-288-g2a9c1", languages: ["eng"], config: { psm: "3" }, formats: ["image/png"], platform: "wasm", unsupported: ["accessibility tree (pixels only)"] };
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "OCR", access: "invited", invited: ["eve"] });
+    await t.as("ada").mutation(api.calls.join, { code: m.code });
+    await t.as(eve).mutation(api.calls.join, { code: m.code });
+    const built = JSON.parse(x.capture_screenshot(PNG, captureRequest()));
+    const ocr = JSON.parse(x.annotate_ocr(built.documentText, PNG, built.contextText, JSON.stringify({ at: "2026-11-25T18:00:05Z", engine, tsv }))).documentText;
+    const link = await t.as("ada").mutation(api.observations.prepare, { code: m.code });
+    const file = await upload(t, link.url, PNG);
+
+    // OCR derived from a different capture of the same pixels is refused.
+    const other = JSON.parse(x.capture_screenshot(PNG, captureRequest([0, 0, 40, 40])));
+    const otherOcr = JSON.parse(x.annotate_ocr(other.documentText, PNG, other.contextText, JSON.stringify({ at: "2026-11-25T18:00:05Z", engine, tsv }))).documentText;
+    await assert.rejects(t.as("ada").action(api.observations.add, { code: m.code, fileId: file.id, artifact: built.documentText, contextText: built.contextText, ocr: otherOcr }), (e: any) => code(e) === "INVALID_ARGUMENT");
+
+    const recorded = await t.as("ada").action(api.observations.add, { code: m.code, fileId: file.id, artifact: built.documentText, contextText: built.contextText, ocr });
+    const got = await t.as(eve).query(api.observations.get, { id: recorded.id });
+    assert.equal(got.artifact, built.documentText, "the original capture artifact, unchanged");
+    assert.equal(got.artifactId, JSON.parse(built.documentText).id);
+    assert.equal(got.ocrArtifactId, JSON.parse(ocr).id);
+    assert.equal(JSON.parse(got.ocrArtifact!).provenance.derivedFrom, got.artifactId, "linked, separate");
+    assert.match(got.projection, /ocr\.text "Text recognized by tesseract 5\.1\.0-288-g2a9c1/, "text models read what the browser recognized, attributed to its engine");
+    assert.match(got.projection, /!inferred/);
+  } finally {
+    await t.close();
+  }
+});

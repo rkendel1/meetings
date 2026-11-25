@@ -19,14 +19,18 @@
     "e2e:identity": "node scripts/e2e-identity.mjs",
     "e2e:starter": "node scripts/e2e-starter.mjs",
     "e2e:demo": "node scripts/e2e-demo.mjs",
-    "measure": "feltkit measure"
+    "measure": "feltkit measure",
+    "predev": "node scripts/vendor-ocr.mjs",
+    "prebuild": "node scripts/vendor-ocr.mjs"
   },
   "dependencies": {
     "@feltdb/feltkit": "0.5.0",
     "@feltdb/webllm": "^0.25.0",
     "@mlc-ai/web-llm": "^0.2.84",
+    "@tesseract.js-data/eng": "1.0.0",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@types/node": "22.19.1",

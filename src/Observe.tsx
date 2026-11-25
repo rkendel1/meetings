@@ -10,8 +10,9 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useFeltKit, useMutation, useQueryState } from "@feltdb/feltkit/react";
 import { api } from "../feltkit/_generated/api";
+import { ENGINE, readText } from "./ocr";
 
-type Xeet = { capture_screenshot(image: Uint8Array, request: string): string };
+type Xeet = { capture_screenshot(image: Uint8Array, request: string): string; annotate_ocr(document: string, image: Uint8Array, contextText: string | undefined, request: string): string };
 let xeet: Promise<Xeet> | null = null;
 function loadXeet(): Promise<Xeet> {
   xeet ??= (async () => {
@@ -149,13 +150,22 @@ export function CaptureDialog({ code, onClose, onError }: { code: string; onClos
         notes: [`displaySurface: ${frame.surface}`, "Coordinates are pixels of the captured surface (the browser reports no global screen position)."],
       };
       const built = JSON.parse((await loadXeet()).capture_screenshot(bytes, JSON.stringify({ capturedAt: new Date().toISOString(), method: "getDisplayMedia", declaredType: "image/png", context })));
+      // Browser OCR: a separate artifact derived from the capture, so models that cannot see get the text too.
+      let ocr: string | undefined;
+      try {
+        setBusy("Reading the text (OCR, on this device)…");
+        const tsv = await readText(blob);
+        ocr = JSON.parse((await loadXeet()).annotate_ocr(built.documentText, bytes, built.contextText, JSON.stringify({ at: new Date().toISOString(), engine: ENGINE, tsv }))).documentText;
+      } catch (e) {
+        onError(new Error(`The capture is sent without OCR: ${(e as Error).message ?? e}`));
+      }
       setBusy("Uploading…");
       const link = await prepare({ code });
       const put = await fetch(link.url, { method: "PUT", headers: { "content-type": "image/png", "x-file-name": "observation.png" }, body: bytes });
       const uploaded = await put.json();
       if (!put.ok || !uploaded.ok) throw new Error(uploaded?.error?.message ?? `Upload failed (${put.status}).`);
       setBusy("Verifying and sending…");
-      await client.action(api.observations.add, { code, fileId: uploaded.file.id, artifact: built.documentText, contextText: built.contextText, ...(caption.trim() ? { caption: caption.trim() } : {}) });
+      await client.action(api.observations.add, { code, fileId: uploaded.file.id, artifact: built.documentText, contextText: built.contextText, ...(ocr ? { ocr } : {}), ...(caption.trim() ? { caption: caption.trim() } : {}) });
       onClose();
     } catch (e) {
       onError(e);

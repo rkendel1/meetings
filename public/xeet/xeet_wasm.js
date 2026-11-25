@@ -1,6 +1,58 @@
 /* @ts-self-types="./xeet_wasm.d.ts" */
 
 /**
+ * Adds what a browser's OCR engine (tesseract.js) read from the pixels to
+ * a screenshot artifact, as the native `vision.read` path does: a new
+ * artifact `derivedFrom` the original, every line `inferred` and
+ * attributed to the engine. `document`, `image` and `context_text` are
+ * the original's verbatim text and bytes (checked before use). `request`
+ * is `{ at, engine, tsv }` (Tesseract TSV, with or without its header
+ * line) or `{ at, reading }` (an `xeet-ocr/1` result). Pure. Returns `{
+ * documentText, id, derivedFrom, lines, uncertainLines }`; store and send
+ * `documentText` verbatim.
+ * @param {string} document
+ * @param {Uint8Array | number[]} image
+ * @param {string | null | undefined} context_text
+ * @param {string} request
+ * @returns {string}
+ */
+export function annotate_ocr(document, image, context_text, request) {
+    let deferred6_0;
+    let deferred6_1;
+    try {
+        let ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3;
+        try {
+            ptr0 = passStringToWasm0(document, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len0 = WASM_VECTOR_LEN;
+            ptr1 = passArray8ToWasm0(image, wasm.__wbindgen_malloc);
+            len1 = WASM_VECTOR_LEN;
+            ptr2 = isLikeNone(context_text) ? 0 : passStringToWasm0(context_text, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len2 = WASM_VECTOR_LEN;
+            ptr3 = passStringToWasm0(request, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len3 = WASM_VECTOR_LEN;
+        } catch (e) {
+            if (ptr3) { wasm.__wbindgen_free(ptr3, len3 * 1, 1); }
+            if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 1, 1); }
+            if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+            if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 1, 1); }
+            throw e;
+        }
+        const ret = wasm.annotate_ocr(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
+        var ptr5 = ret[0];
+        var len5 = ret[1];
+        if (ret[3]) {
+            ptr5 = 0; len5 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred6_0 = ptr5;
+        deferred6_1 = len5;
+        return getStringFromWasm0(ptr5, len5);
+    } finally {
+        wasm.__wbindgen_free(deferred6_0, deferred6_1, 1);
+    }
+}
+
+/**
  * Runs one request and returns a framed response buffer (see the module
  * docs). Bad input, a limit overrun or a stage failure comes back as an
  * error frame, never a trap.
@@ -476,7 +528,7 @@ function __wbg_get_imports() {
             return ret;
         },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 879, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 909, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_86072e8c5cf0a02b___convert__closures_____invoke___wasm_bindgen_86072e8c5cf0a02b___JsValue__core_7d5f0a2ba6a62c33___result__Result_____wasm_bindgen_86072e8c5cf0a02b___JsError___true_);
             return ret;
         },

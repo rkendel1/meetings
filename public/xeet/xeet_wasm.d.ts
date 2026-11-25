@@ -2,6 +2,19 @@
 /* eslint-disable */
 
 /**
+ * Adds what a browser's OCR engine (tesseract.js) read from the pixels to
+ * a screenshot artifact, as the native `vision.read` path does: a new
+ * artifact `derivedFrom` the original, every line `inferred` and
+ * attributed to the engine. `document`, `image` and `context_text` are
+ * the original's verbatim text and bytes (checked before use). `request`
+ * is `{ at, engine, tsv }` (Tesseract TSV, with or without its header
+ * line) or `{ at, reading }` (an `xeet-ocr/1` result). Pure. Returns `{
+ * documentText, id, derivedFrom, lines, uncertainLines }`; store and send
+ * `documentText` verbatim.
+ */
+export function annotate_ocr(document: string, image: Uint8Array | number[], context_text: string | null | undefined, request: string): string;
+
+/**
  * Runs one request and returns a framed response buffer (see the module
  * docs). Bad input, a limit overrun or a stage failure comes back as an
  * error frame, never a trap.
@@ -84,6 +97,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
+    readonly annotate_ocr: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
     readonly call: (a: number, b: number, c: number) => [number, number];
     readonly capture_screenshot: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly missing_packs: (a: number, b: number) => [number, number];
