@@ -88,7 +88,7 @@ export function App() {
                 </select>
               </label>
             )}
-            {DEMO && principal && (
+            {DEMO && principal && !session?.devUsers.length && (
               <label className="identity">
                 <span className="sr-only">Demo persona</span>
                 <select value={PERSONAS.find((p) => p.name === principal.displayName)?.id ?? ""} aria-label="Demo persona" title="Switch persona to meet yourself: open a second browser as someone else" onChange={(e) => void signOut().then(() => signInAsPersona({ signIn, signUp }, e.target.value)).catch(report)}>

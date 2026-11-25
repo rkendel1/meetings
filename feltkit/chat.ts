@@ -1,6 +1,7 @@
 import { fail, s } from "@feltdb/feltkit";
 import { app } from "./app.js";
 import { REACTIONS, append, callState, latestCall, meetingFor, ownPeer, type Meeting } from "./_meeting.js";
+import { notifyAgents } from "./orgagents.js";
 
 const Posted = s.object({ id: s.string() });
 
@@ -27,7 +28,9 @@ export const send = app.mutation({
   handler: async (ctx, { code, text }) => {
     const meeting = await meetingFor(ctx, code);
     if (!text.trim()) fail("INVALID_ARGUMENT", "Say something.");
-    return { id: await append(ctx, meeting, { callId: await openCallId(ctx, meeting), kind: "chat", text: text.trim() }) };
+    const id = await append(ctx, meeting, { callId: await openCallId(ctx, meeting), kind: "chat", text: text.trim() });
+    await notifyAgents(ctx, meeting.id);
+    return { id };
   },
 });
 
