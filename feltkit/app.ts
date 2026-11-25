@@ -15,14 +15,14 @@ export const app = feltkit({
   description: "Video meetings that people and agents attend together: chat, reactions, live captions, recaps.",
   roles: {
     // People: create meetings, join calls (media + signaling), chat, captions, notes.
-    member: ["meetings.*", "observations.*", "files.read", "files.write", "chat.*", "captions.*", "notes.*", "signal.*", "media.*", "notifications.*", "actions.*", "decisions.*", "summaries.*", "search.*", "recording.*", "ai.*", "feltkit.agent.*"],
+    member: ["meetings.*", "agents.read", "observations.*", "files.read", "files.write", "chat.*", "captions.*", "notes.*", "signal.*", "media.*", "notifications.*", "actions.*", "decisions.*", "summaries.*", "search.*", "recording.*", "ai.*", "feltkit.agent.*"],
     // Agents: see meetings they may attend, attend (presence only, no media), read the timeline,
     // chat, react, and leave notes for the recap. They cannot create meetings, host, or caption.
     // They also keep the meeting's records (action items, decisions, summaries) and research past meetings.
     agent: ["meetings.read", "meetings.attend", "observations.read", "files.read", "chat.*", "notes.*", "actions.*", "decisions.*", "summaries.*", "search.*", "notifications.read", "feltkit.agent.*"],
     // Admins configure the app in Studio → Services (the model, credentials, API keys) and here: branding,
     // retention, and the maintenance sweep a schedule runs.
-    admin: ["intelligence.*", "credential.*", "configuration.*", "apikeys.*", "settings.*", "maintenance.*", "notifications.send", "jobs.*", "schedules.*", "feltkit.operations.*"],
+    admin: ["agents.*", "intelligence.*", "credential.*", "configuration.*", "apikeys.*", "settings.*", "maintenance.*", "notifications.send", "jobs.*", "schedules.*", "feltkit.operations.*"],
     // The application's own agents (feltkit/agents.ts): each holds only what its work needs, as its own principal.
     scribe: ["scribe.run", "notifications.send"],
     assistant: ["assistant.run"],
@@ -68,6 +68,32 @@ export const app = feltkit({
     intelligence: true,
   },
 });
+
+/**
+ * The organization's agents: the external agent identities (an API key or agent session holding the `agent` role) this
+ * organization has registered to attend its meetings, such as Eve. An administrator registers, describes and disables
+ * them (feltkit/orgagents.ts). An external agent that is not registered and active attends nothing here, whoever
+ * invites it. Registration says the organization owns the agent; it grants no authority beyond the agent role, and
+ * none in any other application: what the agent may do elsewhere is decided there, under people's delegations.
+ * One deployment of Meetings is one organization (the app has no tenants).
+ */
+export const orgAgents = app.collection(
+  "orgAgents",
+  {
+    principalId: s.string({ minLength: 1, maxLength: 120 }),
+    name: s.string({ minLength: 1, maxLength: 60 }),
+    purpose: s.optional(s.string({ maxLength: 300 })),
+    // Where the agent executes and who answers for it, as the organization describes it (shown to participants).
+    operatedBy: s.optional(s.string({ maxLength: 200 })),
+    status: s.enum(["active", "disabled"] as const),
+    registeredById: s.string(),
+    registeredByName: s.string(),
+    registeredAt: s.number(),
+    changedById: s.optional(s.string()),
+    changedAt: s.optional(s.number()),
+  },
+  { unique: [["principalId"]] },
+);
 
 /** When housekeeping last ran (feltkit/agents.ts, the janitor): one record. */
 export const housekeeping = app.collection("housekeeping", { key: s.string({ maxLength: 16 }), lastAt: s.number() }, { unique: [["key"]] });

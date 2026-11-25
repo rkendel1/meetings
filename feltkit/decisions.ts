@@ -1,6 +1,6 @@
 import { fail, s } from "@feltdb/feltkit";
 import { app } from "./app.js";
-import { meetingFor } from "./_meeting.js";
+import { meetingFor, requireStanding } from "./_meeting.js";
 import { DecisionOut, strip } from "./_schemas.js";
 import { actor, addDecision, callOf, decisionStatus, decisions, mayReadRecords, tookPart, type Decision } from "./_records.js";
 import { meetings } from "./app.js";
@@ -53,6 +53,7 @@ export const confirm = app.mutation({
   returns: DecisionOut,
   capability: { name: "decisions.confirm", description: "Confirm a proposed decision as decided. People only; an agent's proposals are confirmed by a person." },
   handler: async (ctx, { id }) => {
+    await requireStanding(ctx);
     const me = actor(ctx);
     const d = (await ctx.db.get(decisions, id)) as Decision | null;
     const meeting = d ? ((await ctx.db.get(meetings, d.meetingId)) as Meeting | null) : null;

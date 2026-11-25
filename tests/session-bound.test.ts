@@ -10,6 +10,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createTestApp } from "@feltdb/feltkit/testing";
 import { api } from "../feltkit/_generated/api";
+import { registerAgents } from "./_org";
 
 const ada = { id: "ada", type: "user" as const, displayName: "Ada Lovelace", roles: ["member"] };
 const grace = { id: "grace", type: "user" as const, displayName: "Grace Hopper", roles: ["member"] };
@@ -18,6 +19,7 @@ const code = (e: any) => e?.code;
 
 async function boot() {
   const t = await createTestApp();
+  await registerAgents(t);
   const as = (principal: typeof ada | typeof grace | typeof claude, session: string | null) => ({
     mutation: async (fn: { name: string }, args: unknown) => unwrap(await t.runtime.call(fn.name, args, { principal, via: "test", ...(session ? { session: { ref: session } } : {}) } as any)),
     query: async (fn: { name: string }, args: unknown) => unwrap(await t.runtime.call(fn.name, args, { principal, via: "test", ...(session ? { session: { ref: session } } : {}) } as any)),

@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fail, s } from "@feltdb/feltkit";
 import { app, meetings } from "./app.js";
-import { append, callState, latestCall, meetingFor, kindOf, nameOf, type Meeting } from "./_meeting.js";
+import { append, callState, latestCall, meetingFor, kindOf, nameOf, type Meeting, requireStanding } from "./_meeting.js";
 import { mayReadRecords } from "./_records.js";
 
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -220,6 +220,7 @@ export const get = app.query({
   returns: s.object({ ...outFields, imageBase64: s.string(), artifact: s.string(), contextText: s.optional(s.string()) }),
   capability: { name: "observations.get", description: "An observation's original image (base64, the captured bytes unchanged), its metadata and its xeet artifact (digest, capture context). The image is evidence of what was on screen; what you conclude from it is your own statement, not part of the observation." },
   handler: async (ctx, { id }) => {
+    await requireStanding(ctx);
     const o = await readable(ctx, (await ctx.db.get(observations, id)) as Observation | null);
     const { bytes } = await ctx.services.files.read(o.fileId);
     const sha256 = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;

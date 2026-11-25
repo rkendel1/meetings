@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createTestApp } from "@feltdb/feltkit/testing";
 import { api } from "../feltkit/_generated/api";
+import { registerAgents } from "./_org";
 
 const SDP = "v=0\r\no=- 1 1 IN IP4 0.0.0.0\r\ns=-\r\nt=0 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n";
 const code = (e: any) => e?.code;
@@ -13,6 +14,7 @@ const realNow = Date.now;
 
 async function pair() {
   const t = await createTestApp();
+  await registerAgents(t);
   const m = await t.as("ada").mutation(api.meetings.create, { title: "Signals", agents: "open" });
   const a = await t.as("ada").mutation(api.calls.join, { code: m.code });
   const g = await t.as("grace").mutation(api.calls.join, { code: m.code });

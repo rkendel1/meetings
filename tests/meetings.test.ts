@@ -2,11 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createTestApp } from "@feltdb/feltkit/testing";
 import { api } from "../feltkit/_generated/api";
+import { registerAgents } from "./_org";
 
 const claude = { id: "claude", type: "agent" as const, displayName: "Claude", roles: ["agent"] };
 
 test("people start, share and end a call; the recap keeps attendance and the timeline", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const m = await t.as("ada").mutation(api.meetings.create, { title: "Standup" });
     assert.match(m.code, /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/);
@@ -61,6 +63,7 @@ test("people start, share and end a call; the recap keeps attendance and the tim
 
 test("an agent attends a live call, follows the timeline and leaves notes; it never keeps a call open", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const m = await t.as("ada").mutation(api.meetings.create, { title: "Planning", agents: "open" });
     await assert.rejects(t.as(claude).mutation(api.calls.join, { code: m.code }), /No call is running/);
@@ -99,6 +102,7 @@ test("an agent attends a live call, follows the timeline and leaves notes; it ne
 
 test("invited meetings admit only the host and invitees, people or agents", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const m = await t.as("ada").mutation(api.meetings.create, { title: "1:1", access: "invited", invited: ["grace"] });
     await assert.rejects(t.as("alan").query(api.meetings.get, { code: m.code }), (e: any) => e.code === "NOT_FOUND");
@@ -117,6 +121,7 @@ test("invited meetings admit only the host and invitees, people or agents", asyn
 
 test("the host removes a connection or ends the call for everyone", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const m = await t.as("ada").mutation(api.meetings.create, { title: "Review" });
     await t.as("ada").mutation(api.calls.join, { code: m.code });

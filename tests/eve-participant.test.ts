@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { createTestApp } from "@feltdb/feltkit/testing";
 import { api } from "../feltkit/_generated/api";
+import { registerAgents } from "./_org";
 
 const eve = { id: "eve", type: "agent" as const, displayName: "Eve", roles: ["agent"] };
 const intruder = { id: "other-agent", type: "agent" as const, displayName: "Other", roles: ["agent"] };
@@ -38,6 +39,7 @@ async function upload(t: any, url: string, bytes: Uint8Array) {
 
 test("Eve attends only the meetings she is invited to, as an agent, and cannot host, capture or decide", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const m = await t.as("ada").mutation(api.meetings.create, { title: "Sprint review", access: "invited", invited: ["grace", "eve"] });
     const other = await t.as("ada").mutation(api.meetings.create, { title: "Private", access: "invited", invited: ["grace"] });
@@ -57,8 +59,39 @@ test("Eve attends only the meetings she is invited to, as an agent, and cannot h
   }
 });
 
+test("the organization owns its agents: only registered, active agents attend; disabling one removes it at once", async () => {
+  const t = await createTestApp();
+  await registerAgents(t);
+  const rogue = { id: "rogue", type: "agent" as const, displayName: "Rogue", roles: ["agent"] };
+  try {
+    const m = await t.as("ada").mutation(api.meetings.create, { title: "Weekly", access: "invited", invited: ["eve", "rogue"] });
+    await t.as("ada").mutation(api.calls.join, { code: m.code });
+    // Invited but not the organization's: refused everything, whoever invited it.
+    await assert.rejects(t.as(rogue).mutation(api.calls.join, { code: m.code }), (e: any) => code(e) === "FORBIDDEN");
+    await assert.rejects(t.as(rogue).query(api.meetings.list, {}), (e: any) => code(e) === "FORBIDDEN");
+    // Only an administrator registers or disables agents; members see who they are.
+    await assert.rejects(t.as("grace").mutation(api.orgagents.register, { principalId: "rogue", name: "Rogue" }), (e: any) => code(e) === "FORBIDDEN");
+    assert.deepEqual((await t.as("grace").query(api.orgagents.list, {})).find((a: any) => a.principalId === "eve")?.status, "active");
+
+    await t.as(eve).mutation(api.calls.join, { code: m.code });
+    await t.as("ada").mutation(api.orgagents.setStatus, { principalId: "eve", status: "disabled" });
+    const live = await t.as("ada").query(api.meetings.get, { code: m.code });
+    assert.deepEqual(live.peers.map((p: any) => p.principalId), ["ada"], "a disabled agent leaves the running call at once");
+    await assert.rejects(t.as(eve).query(api.meetings.feed, { code: m.code }), (e: any) => code(e) === "FORBIDDEN");
+    await assert.rejects(t.as(eve).query(api.continuity.context, { code: m.code }), (e: any) => code(e) === "FORBIDDEN");
+    const feed = await t.as("ada").query(api.meetings.feed, { code: m.code });
+    assert.ok(feed.entries.some((e: any) => e.kind === "system" && /disabled by the organization/.test(e.text)));
+
+    await t.as("ada").mutation(api.orgagents.setStatus, { principalId: "eve", status: "active" });
+    await t.as(eve).mutation(api.calls.join, { code: m.code });
+  } finally {
+    await t.close();
+  }
+});
+
 test("only a person decides: an agent's decision is a proposal until a person confirms it", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const m = await t.as("ada").mutation(api.meetings.create, { title: "Planning", access: "invited", invited: ["eve"] });
     await t.as("ada").mutation(api.calls.join, { code: m.code });
@@ -81,6 +114,7 @@ test("only a person decides: an agent's decision is a proposal until a person co
 
 test("meetings.context: the previous meeting's decisions and open commitments, each with the line it came from; withheld from someone not in it", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const before = await t.as("ada").mutation(api.meetings.create, { title: "Sprint 41", access: "invited", invited: ["grace", "eve"] });
     const a = await t.as("ada").mutation(api.calls.join, { code: before.code });
@@ -124,6 +158,7 @@ test("meetings.context: the previous meeting's decisions and open commitments, e
 
 test("observations: a present person's capture, verified against the stored bytes; Eve receives the original image and its artifact", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const x = await xeet();
     const m = await t.as("ada").mutation(api.meetings.create, { title: "Bug triage", access: "invited", invited: ["grace", "eve"] });
