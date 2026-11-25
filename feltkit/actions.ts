@@ -3,7 +3,7 @@ import { app } from "./app.js";
 import { meetings } from "./app.js";
 import { mayAttend, meetingFor, type Meeting } from "./_meeting.js";
 import { ActionOut, strip } from "./_schemas.js";
-import { actionItems, actor, addAction, callOf, mayReadRecords, notifyAssigned, participants, resolveAssignee, tookPart, type ActionItem } from "./_records.js";
+import { actionItems, actor, addAction, callOf, mayReadRecords, notifyAssigned, participants, resolveAssignee, tookPart, type ActionItem, type EvidenceLink } from "./_records.js";
 
 const Created = s.object({ id: s.string(), created: s.boolean() });
 
@@ -105,3 +105,33 @@ export const list = app.query({
 function kindOfPrincipal(p: { type: string }): "person" | "agent" {
   return p.type === "user" ? "person" : "agent";
 }
+
+/**
+ * Link evidence to an action item (a pull request, an observation, an agent's session, a link): what happened, and
+ * where to see it. It never changes the item's status; whoever may update the item decides when it is done.
+ */
+export const addEvidence = app.mutation({
+  access: "actions.write",
+  args: {
+    id: s.string(),
+    kind: s.enum(["pull_request", "observation", "agent_session", "link"] as const),
+    ref: s.string({ minLength: 1, maxLength: 200 }),
+    url: s.optional(s.string({ maxLength: 500 })),
+    note: s.optional(s.string({ maxLength: 500 })),
+  },
+  returns: ActionOut,
+  retry: { sequenceConflicts: 5 },
+  capability: { name: "actions.evidence", description: "Link evidence to an action item: a pull request, an observation, an agent session or a link, with an optional note. It does not mark the item done." },
+  handler: async (ctx, args) => {
+    const me = actor(ctx);
+    const item = (await ctx.db.get(actionItems, args.id)) as ActionItem | null;
+    const meeting = item ? ((await ctx.db.get(meetings, item.meetingId)) as Meeting | null) : null;
+    if (!item || !meeting || !mayAttend(meeting, me.id, me.kind) || !(await tookPart(ctx, meeting, me.id))) fail("NOT_FOUND", "No such action item.");
+    if (args.url !== undefined && !/^https:\/\//.test(args.url)) fail("INVALID_ARGUMENT", "Evidence links are https URLs.");
+    const existing = item.evidence ?? [];
+    if (existing.some((e) => e.kind === args.kind && e.ref === args.ref)) return strip(item);
+    if (existing.length >= 50) fail("FAILED_PRECONDITION", "This action item already has 50 pieces of evidence.");
+    const link: EvidenceLink = { kind: args.kind, ref: args.ref, ...(args.url ? { url: args.url } : {}), ...(args.note ? { note: args.note } : {}), addedById: me.id, addedByName: me.name, addedAt: Date.now() };
+    return strip((await ctx.db.patch(actionItems, item.id, { evidence: [...existing, link] })) as ActionItem);
+  },
+});

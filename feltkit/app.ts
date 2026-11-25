@@ -15,11 +15,11 @@ export const app = feltkit({
   description: "Video meetings that people and agents attend together: chat, reactions, live captions, recaps.",
   roles: {
     // People: create meetings, join calls (media + signaling), chat, captions, notes.
-    member: ["meetings.*", "chat.*", "captions.*", "notes.*", "signal.*", "media.*", "notifications.*", "actions.*", "decisions.*", "summaries.*", "search.*", "recording.*", "ai.*", "feltkit.agent.*"],
+    member: ["meetings.*", "observations.*", "files.read", "files.write", "chat.*", "captions.*", "notes.*", "signal.*", "media.*", "notifications.*", "actions.*", "decisions.*", "summaries.*", "search.*", "recording.*", "ai.*", "feltkit.agent.*"],
     // Agents: see meetings they may attend, attend (presence only, no media), read the timeline,
     // chat, react, and leave notes for the recap. They cannot create meetings, host, or caption.
     // They also keep the meeting's records (action items, decisions, summaries) and research past meetings.
-    agent: ["meetings.read", "meetings.attend", "chat.*", "notes.*", "actions.*", "decisions.*", "summaries.*", "search.*", "notifications.read", "feltkit.agent.*"],
+    agent: ["meetings.read", "meetings.attend", "observations.read", "files.read", "chat.*", "notes.*", "actions.*", "decisions.*", "summaries.*", "search.*", "notifications.read", "feltkit.agent.*"],
     // Admins configure the app in Studio → Services (the model, credentials, API keys) and here: branding,
     // retention, and the maintenance sweep a schedule runs.
     admin: ["intelligence.*", "credential.*", "configuration.*", "apikeys.*", "settings.*", "maintenance.*", "notifications.send", "jobs.*", "schedules.*", "feltkit.operations.*"],
@@ -59,6 +59,10 @@ export const app = feltkit({
     jobs: { handlers: { "maintenance.sweep": "maintenance:sweep" } },
     schedules: true,
     configuration: true,
+    // Observations (feltkit/observations.ts): a participant's screen captures, kept as the original bytes. files.read
+    // and files.write in the roles above only let this app's own functions reach the bytes: FeltKit publishes no file
+    // capability to callers, and observations.get authorizes each read against the meeting (mayReadRecords) first.
+    files: true,
     // An API key holds the agent role: that is how an agent outside this machine attends.
     apiKeys: { roles: ["agent"] },
     intelligence: true,
@@ -82,6 +86,8 @@ export const meetings = app.collection(
     // Which agents may attend: only those the host listed in `invited` (approved), or any agent holding the link (open).
     agents: s.optional(s.enum(["approved", "open"] as const)),
     scheduledFor: s.optional(s.number()),
+    // The meeting this one continues, set by the host (never inferred): "what did we decide last time" reads it.
+    previousMeetingId: s.optional(s.string()),
     createdAt: s.number(),
   },
   { unique: [["code"]], indexes: [{ fields: ["hostId"] }] },
@@ -115,7 +121,7 @@ export const entries = app.collection(
     meetingId: s.ref("meetings"),
     callId: s.optional(s.string()),
     seq: s.integer({ minimum: 1 }),
-    kind: s.enum(["chat", "caption", "reaction", "note", "system"] as const),
+    kind: s.enum(["chat", "caption", "reaction", "note", "system", "observation"] as const),
     authorId: s.string(),
     authorName: s.string(),
     authorKind: s.enum(["person", "agent"] as const),

@@ -11,6 +11,20 @@ import { kindOf, mayReadCall, nameOf, type Call, type Meeting, type Peer } from 
 
 const Source = s.enum(["person", "agent", "scribe", "model"] as const);
 
+/**
+ * Evidence that something happened, linked to the record it supports: a pull request, an observation (a screen
+ * capture), an agent's session, or a link. It says where to look; it is not proof by itself being here.
+ */
+export const Evidence = s.object({
+  kind: s.enum(["pull_request", "observation", "agent_session", "link"] as const),
+  ref: s.string({ minLength: 1, maxLength: 200 }),
+  url: s.optional(s.string({ maxLength: 500 })),
+  note: s.optional(s.string({ maxLength: 500 })),
+  addedById: s.string(),
+  addedByName: s.string(),
+  addedAt: s.number(),
+});
+
 export const actionItems = app.collection(
   "actionItems",
   {
@@ -29,6 +43,7 @@ export const actionItems = app.collection(
     createdAt: s.number(),
     completedAt: s.optional(s.number()),
     remindedAt: s.optional(s.number()),
+    evidence: s.optional(s.array(Evidence)),
   },
   { indexes: [{ fields: ["meetingId"] }, { fields: ["assigneeId"] }, { fields: ["status"] }] },
 );
@@ -44,6 +59,13 @@ export const decisions = app.collection(
     madeById: s.string(),
     madeByName: s.string(),
     createdAt: s.number(),
+    // proposed: written by an agent, the scribe or a model, not yet agreed. decided: a person recorded or confirmed
+    // it. superseded: a later decision replaced it. Absent on older records: read by source (decisionStatus).
+    status: s.optional(s.enum(["proposed", "decided", "superseded"] as const)),
+    decidedById: s.optional(s.string()),
+    decidedByName: s.optional(s.string()),
+    decidedAt: s.optional(s.number()),
+    supersededBy: s.optional(s.string()),
   },
   { indexes: [{ fields: ["meetingId"] }] },
 );
@@ -66,8 +88,14 @@ export const summaries = app.collection(
   { indexes: [{ fields: ["meetingId"] }, { fields: ["callId"] }] },
 );
 
-export type ActionItem = { id: string; meetingId: string; callId?: string; text: string; assigneeId?: string; assigneeName?: string; dueAt?: number; status: "open" | "done" | "cancelled"; source: "person" | "agent" | "scribe" | "model"; sourceEntryId?: string; createdById: string; createdByName: string; createdAt: number; completedAt?: number; remindedAt?: number };
-export type Decision = { id: string; meetingId: string; callId?: string; text: string; source: ActionItem["source"]; sourceEntryId?: string; madeById: string; madeByName: string; createdAt: number };
+export type EvidenceLink = { kind: "pull_request" | "observation" | "agent_session" | "link"; ref: string; url?: string; note?: string; addedById: string; addedByName: string; addedAt: number };
+export type ActionItem = { id: string; meetingId: string; callId?: string; text: string; assigneeId?: string; assigneeName?: string; dueAt?: number; status: "open" | "done" | "cancelled"; source: "person" | "agent" | "scribe" | "model"; sourceEntryId?: string; createdById: string; createdByName: string; createdAt: number; completedAt?: number; remindedAt?: number; evidence?: EvidenceLink[] };
+export type Decision = { id: string; meetingId: string; callId?: string; text: string; source: ActionItem["source"]; sourceEntryId?: string; madeById: string; madeByName: string; createdAt: number; status?: "proposed" | "decided" | "superseded"; decidedById?: string; decidedByName?: string; decidedAt?: number; supersededBy?: string };
+
+/** A decision's standing: only a person decides; anything an agent, the scribe or a model wrote is a proposal until one does. */
+export function decisionStatus(d: Decision): "proposed" | "decided" | "superseded" {
+  return d.status ?? (d.source === "person" ? "decided" : "proposed");
+}
 export type Summary = { id: string; meetingId: string; callId: string; text: string; source: ActionItem["source"]; model?: string; taskId?: string; authorId: string; authorName: string; createdAt: number };
 
 type Principal = { id: string; type: string; displayName?: string };
@@ -199,6 +227,8 @@ export async function addDecision(
   const existing = (await ctx.db.find(decisions, { meetingId: meeting.id })) as Decision[];
   const dup = existing.find((d) => (input.sourceEntryId && d.sourceEntryId === input.sourceEntryId) || d.text.trim().toLowerCase() === input.text.trim().toLowerCase());
   if (dup) return { id: dup.id, created: false };
+  const now = Date.now();
+  const decided = input.source === "person";
   const id = await ctx.db.insert(decisions, {
     meetingId: meeting.id,
     ...(input.callId ? { callId: input.callId } : {}),
@@ -207,7 +237,8 @@ export async function addDecision(
     ...(input.sourceEntryId ? { sourceEntryId: input.sourceEntryId } : {}),
     madeById: input.by.id,
     madeByName: input.by.name,
-    createdAt: Date.now(),
+    createdAt: now,
+    ...(decided ? { status: "decided", decidedById: input.by.id, decidedByName: input.by.name, decidedAt: now } : { status: "proposed" }),
   });
   return { id, created: true };
 }

@@ -9,7 +9,7 @@ export const REACTIONS = ["👍", "👏", "😂", "🎉", "❤️", "🤔"] as c
 
 type Principal = { id: string; type: string; displayName?: string };
 export type LeftReason = "left" | "replaced" | "expired" | "removed" | "ended" | "session-ended";
-export type Meeting = { id: string; code: string; title: string; hostId: string; hostName: string; access: "link" | "invited"; invited: string[]; agents?: "approved" | "open"; scheduledFor?: number; createdAt: number };
+export type Meeting = { id: string; code: string; title: string; hostId: string; hostName: string; access: "link" | "invited"; invited: string[]; agents?: "approved" | "open"; scheduledFor?: number; previousMeetingId?: string; createdAt: number };
 export type Call = { id: string; meetingId: string; number: number; startedAt: number; endedAt?: number; open?: boolean; recording?: { by: string; byName: string; startedAt: number; stoppedAt?: number } };
 export type Peer = { id: string; meetingId: string; callId: string; principalId: string; name: string; kind: "person" | "agent"; joinedAt: number; lastSeenAt: number; leftAt?: number; leftReason?: LeftReason; sessionRef?: string; signalWindowAt?: number; signalCount?: number; mic: boolean; cam: boolean; screen: boolean; hand: boolean };
 
@@ -101,7 +101,7 @@ export async function mayReadCall(ctx: any, meeting: Meeting, call: Call, princi
 }
 
 /** Append to the meeting's timeline, ordered per meeting. */
-export async function append(ctx: any, meeting: Meeting, entry: { callId?: string; kind: "chat" | "caption" | "reaction" | "note" | "system"; text: string; author?: { id: string; name: string; kind: "person" | "agent" } }) {
+export async function append(ctx: any, meeting: Meeting, entry: { callId?: string; kind: "chat" | "caption" | "reaction" | "note" | "system" | "observation"; text: string; author?: { id: string; name: string; kind: "person" | "agent" } }) {
   const me = entry.author ?? (() => { const p = ctx.auth.requirePrincipal() as Principal; return { id: p.id, name: nameOf(p), kind: kindOf(p) }; })();
   const seq = await ctx.db.sequence(`meeting:${meeting.id}`);
   return ctx.db.insert(entries, {
