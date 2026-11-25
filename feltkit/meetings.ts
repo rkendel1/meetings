@@ -1,6 +1,6 @@
 import { fail, s } from "@feltdb/feltkit";
 import { calls, entries, meetings } from "./app.js";
-import { append, callState, endPeer, kindOf, latestCall, mayAttend, mayReadCall, meetingFor, nameOf, newCode, type Call, type Meeting } from "./_meeting.js";
+import { append, callState, endPeer, kindOf, latestCall, mayAttend, mayReadCall, meetingFor, nameOf, newCode, type Call, type Meeting, requireStanding } from "./_meeting.js";
 import { actionItems, decisions, purgeMeeting, summaries } from "./_records.js";
 import { peers } from "./_presence.js";
 import { kickJanitor } from "./maintenance.js";
@@ -19,6 +19,7 @@ export const list = app.query({
   returns: s.array(Summary),
   capability: { name: "meetings.list", description: "Meetings you host or are invited to, with whether a call is live right now." },
   handler: async (ctx) => {
+    await requireStanding(ctx);
     const me = ctx.auth.requirePrincipal();
     // Hosted ones are index-backed. Invitations are an array field, read by scan: fine at team scale.
     const all = (await ctx.db.find(meetings, {})) as Meeting[];

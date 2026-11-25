@@ -1,0 +1,4 @@
+xeet WebAssembly (browser glue + module), vendored for screenshot observations.
+Built from rkendel1/xeet commit a9c056a (branch claude/trusting-faraday-j5o0md) with tools/ship/build-wasm.mjs,
+wasm-bindgen 0.2.130. Not yet published to npm (@xeet/core 0.1.2 predates capture_screenshot/verify_screenshot).
+Replace with the published package once a release includes these exports.

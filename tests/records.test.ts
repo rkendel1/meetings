@@ -8,6 +8,7 @@ import { createTestApp } from "@feltdb/feltkit/testing";
 import { api } from "../feltkit/_generated/api";
 import { marker, parseAction, resolveAssignee } from "../feltkit/_records";
 import { keywords, parseRecap, recapMessages } from "../feltkit/_ai";
+import { registerAgents } from "./_org";
 
 const claude = { id: "claude", type: "agent" as const, displayName: "Claude", roles: ["agent"] };
 const code = (e: any) => e?.code;
@@ -42,6 +43,7 @@ async function call(t: any, title = "Planning", options: Record<string, unknown>
 
 test("an agent attends only if the host approved it, or opened the meeting to agents", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const { m } = await call(t);
     // A link is enough for people, not for agents: the meeting does not even admit it exists.
@@ -64,6 +66,7 @@ test("an agent attends only if the host approved it, or opened the meeting to ag
 
 test("action items: assigned by first name, the assignee is told, only the right people change them", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const { m } = await call(t);
     const made = await t.as("ada").mutation(api.actions.add, { code: m.code, text: "Send the budget", assignee: "grace", dueAt: Date.now() + 3 * 86_400_000 });
@@ -95,6 +98,7 @@ test("action items: assigned by first name, the assignee is told, only the right
 
 test("an agent keeps the meeting's records like a person, attributed to it", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const { m } = await call(t, "Review", { agents: "open" });
     await t.as(claude).mutation(api.calls.join, { code: m.code });
@@ -120,6 +124,7 @@ test("an agent keeps the meeting's records like a person, attributed to it", asy
 
 test("the scribe writes a call's recap when it ends, once, from what people marked", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const { m, a, g } = await call(t, "Budget");
     await t.as("grace").mutation(api.chat.send, { code: m.code, text: "decision: freeze hiring until March" });
@@ -155,6 +160,7 @@ test("the scribe writes a call's recap when it ends, once, from what people mark
 
 test("search finds what past meetings produced, only in meetings the caller took part in", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const { m, a, g } = await call(t, "Pricing review");
     await t.as("ada").mutation(api.decisions.add, { code: m.code, text: "Keep the team plan at 12 dollars" });
@@ -184,6 +190,7 @@ test("search finds what past meetings produced, only in meetings the caller took
 
 test("recording: only the host, shown to everyone, stopped when the call ends", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const { m } = await call(t, "Interview", { agents: "open" });
     await t.as(claude).mutation(api.calls.join, { code: m.code });
@@ -210,6 +217,7 @@ test("recording: only the host, shown to everyone, stopped when the call ends", 
 
 test("branding is public and the admin's; retention and the sweep are the admin's too", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     assert.equal((await t.as("grace").query(api.settings.brand, {})).name, "Meetings");
     await assert.rejects(t.as("grace").mutation(api.settings.save, { name: "Acme Calls" }), (e) => code(e) === "FORBIDDEN");
@@ -230,6 +238,7 @@ test("branding is public and the admin's; retention and the sweep are the admin'
 test("the sweep ends calls nobody is writing to, reminds owners, and applies retention", async () => {
   const c = clock();
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const { m, a } = await call(t, "Abandoned");
     const item = await t.as("ada").mutation(api.actions.add, { code: m.code, text: "File the report", assignee: "grace", dueAt: c.now() + 3_600_000 });
@@ -264,6 +273,7 @@ test("the sweep ends calls nobody is writing to, reminds owners, and applies ret
 test("nobody has to schedule housekeeping: starting a meeting makes the janitor tidy up, at most every five minutes", async () => {
   const c = clock();
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const { m } = await call(t, "Abandoned");
     await t.as("ada").mutation(api.chat.send, { code: m.code, text: "decision: keep the demo short" });
@@ -290,6 +300,7 @@ test("nobody has to schedule housekeeping: starting a meeting makes the janitor 
 
 test("the host deletes a meeting and everything it kept, and exports it first", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const { m, a, g } = await call(t, "Offboarding");
     await t.as("ada").mutation(api.actions.add, { code: m.code, text: "Return the laptop", assignee: "grace" });
@@ -317,6 +328,7 @@ test("the host deletes a meeting and everything it kept, and exports it first", 
 
 test("the model is asked for by a person: without one configured it says so, and nothing is written", async () => {
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const { m, a, g } = await call(t, "Asks");
     await t.as("grace").mutation(api.calls.leave, { code: m.code, peerId: g.peerId });

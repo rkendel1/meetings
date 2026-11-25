@@ -15,14 +15,14 @@ export const app = feltkit({
   description: "Video meetings that people and agents attend together: chat, reactions, live captions, recaps.",
   roles: {
     // People: create meetings, join calls (media + signaling), chat, captions, notes.
-    member: ["meetings.*", "chat.*", "captions.*", "notes.*", "signal.*", "media.*", "notifications.*", "actions.*", "decisions.*", "summaries.*", "search.*", "recording.*", "ai.*", "feltkit.agent.*"],
+    member: ["meetings.*", "agents.read", "agents.add", "observations.*", "files.read", "files.write", "chat.*", "captions.*", "notes.*", "signal.*", "media.*", "notifications.*", "actions.*", "decisions.*", "summaries.*", "search.*", "recording.*", "ai.*", "feltkit.agent.*"],
     // Agents: see meetings they may attend, attend (presence only, no media), read the timeline,
     // chat, react, and leave notes for the recap. They cannot create meetings, host, or caption.
     // They also keep the meeting's records (action items, decisions, summaries) and research past meetings.
-    agent: ["meetings.read", "meetings.attend", "chat.*", "notes.*", "actions.*", "decisions.*", "summaries.*", "search.*", "notifications.read", "feltkit.agent.*"],
+    agent: ["meetings.read", "meetings.attend", "observations.read", "files.read", "chat.*", "notes.*", "actions.*", "decisions.*", "summaries.*", "search.*", "notifications.read", "feltkit.agent.*"],
     // Admins configure the app in Studio → Services (the model, credentials, API keys) and here: branding,
     // retention, and the maintenance sweep a schedule runs.
-    admin: ["intelligence.*", "credential.*", "configuration.*", "apikeys.*", "settings.*", "maintenance.*", "notifications.send", "jobs.*", "schedules.*", "feltkit.operations.*"],
+    admin: ["agents.*", "intelligence.*", "credential.*", "configuration.*", "apikeys.*", "settings.*", "maintenance.*", "notifications.send", "jobs.*", "schedules.*", "feltkit.operations.*"],
     // The application's own agents (feltkit/agents.ts): each holds only what its work needs, as its own principal.
     scribe: ["scribe.run", "notifications.send"],
     assistant: ["assistant.run"],
@@ -59,11 +59,61 @@ export const app = feltkit({
     jobs: { handlers: { "maintenance.sweep": "maintenance:sweep" } },
     schedules: true,
     configuration: true,
+    // Observations (feltkit/observations.ts): a participant's screen captures, kept as the original bytes. files.read
+    // and files.write in the roles above only let this app's own functions reach the bytes: FeltKit publishes no file
+    // capability to callers, and observations.get authorizes each read against the meeting (mayReadRecords) first.
+    files: true,
     // An API key holds the agent role: that is how an agent outside this machine attends.
     apiKeys: { roles: ["agent"] },
     intelligence: true,
   },
 });
+
+/**
+ * The organization's agents: the external agent identities (an API key or agent session holding the `agent` role) this
+ * organization has registered to attend its meetings, such as Eve. An administrator registers, describes and disables
+ * them (feltkit/orgagents.ts). An external agent that is not registered and active attends nothing here, whoever
+ * invites it. Registration says the organization owns the agent; it grants no authority beyond the agent role, and
+ * none in any other application: what the agent may do elsewhere is decided there, under people's delegations.
+ * One deployment of Meetings is one organization (the app has no tenants).
+ */
+export const orgAgents = app.collection(
+  "orgAgents",
+  {
+    principalId: s.string({ minLength: 1, maxLength: 120 }),
+    name: s.string({ minLength: 1, maxLength: 60 }),
+    purpose: s.optional(s.string({ maxLength: 300 })),
+    // Where the agent executes and who answers for it, as the organization describes it (shown to participants).
+    operatedBy: s.optional(s.string({ maxLength: 200 })),
+    status: s.enum(["active", "disabled"] as const),
+    // How the agent's execution is started when a host adds it to a meeting: "eve" is the Eve application
+    // (integration `eve` below). Without one, adding the agent only invites it.
+    connector: s.optional(s.enum(["eve"] as const)),
+    registeredById: s.string(),
+    registeredByName: s.string(),
+    registeredAt: s.number(),
+    changedById: s.optional(s.string()),
+    changedAt: s.optional(s.number()),
+  },
+  { unique: [["principalId"]] },
+);
+
+/** An organization agent in one meeting: who added it, and whether its execution started (or why not). */
+export const agentParticipation = app.collection(
+  "agentParticipation",
+  {
+    meetingId: s.ref("meetings"),
+    principalId: s.string(),
+    addedById: s.string(),
+    addedByName: s.string(),
+    addedAt: s.number(),
+    status: s.enum(["invited", "started", "failed", "removed"] as const),
+    sessionId: s.optional(s.string({ maxLength: 120 })),
+    detail: s.optional(s.string({ maxLength: 500 })),
+    removedAt: s.optional(s.number()),
+  },
+  { indexes: [{ fields: ["meetingId"] }] },
+);
 
 /** When housekeeping last ran (feltkit/agents.ts, the janitor): one record. */
 export const housekeeping = app.collection("housekeeping", { key: s.string({ maxLength: 16 }), lastAt: s.number() }, { unique: [["key"]] });
@@ -82,6 +132,8 @@ export const meetings = app.collection(
     // Which agents may attend: only those the host listed in `invited` (approved), or any agent holding the link (open).
     agents: s.optional(s.enum(["approved", "open"] as const)),
     scheduledFor: s.optional(s.number()),
+    // The meeting this one continues, set by the host (never inferred): "what did we decide last time" reads it.
+    previousMeetingId: s.optional(s.string()),
     createdAt: s.number(),
   },
   { unique: [["code"]], indexes: [{ fields: ["hostId"] }] },
@@ -115,7 +167,7 @@ export const entries = app.collection(
     meetingId: s.ref("meetings"),
     callId: s.optional(s.string()),
     seq: s.integer({ minimum: 1 }),
-    kind: s.enum(["chat", "caption", "reaction", "note", "system"] as const),
+    kind: s.enum(["chat", "caption", "reaction", "note", "system", "observation"] as const),
     authorId: s.string(),
     authorName: s.string(),
     authorKind: s.enum(["person", "agent"] as const),
@@ -149,6 +201,40 @@ export const turn = app.integration("turn", {
       readOnly: true,
       access: "media.ice",
       expose: false, // only through media:iceServers, which checks the caller is in a live call
+    },
+  },
+});
+
+/**
+ * The Eve application, as this organization's connector for Eve: starting her execution for a meeting when a host adds
+ * her, and ending it when she is removed. Meetings calls it with its own API key for that application
+ * (`credential-ref:eve`; in production `FELTKIT_CREDENTIAL_EVE`), which may only ask Eve to join or leave a meeting.
+ * What Eve may do there comes from the organization's delegation in the Eve application, never from this key.
+ */
+const EveJoined = s.object({ ok: s.boolean(), value: s.object({ sessionId: s.string(), created: s.boolean() }) });
+export const eveApp = app.integration("eve", {
+  description: "The organization's Eve application: start or end Eve's work for a meeting.",
+  baseUrl: { env: "EVE_APP_URL", development: "http://127.0.0.1:3300" },
+  credential: "credential-ref:eve",
+  timeoutMs: 15000,
+  operations: {
+    join: {
+      method: "POST",
+      path: "/api/capability/eve.meetings.join",
+      input: { input: s.object({ code: s.string(), title: s.string(), requestedBy: s.object({ id: s.string(), name: s.string() }) }), idempotencyKey: s.string() },
+      output: EveJoined,
+      effect: "consequential",
+      access: "agents.add",
+      expose: false, // only through orgagents:add, which checks the host and the organization's registry
+    },
+    leave: {
+      method: "POST",
+      path: "/api/capability/eve.meetings.leave",
+      input: { input: s.object({ code: s.string() }) },
+      output: s.object({ ok: s.boolean(), value: s.object({ ended: s.boolean() }) }),
+      effect: "consequential",
+      access: "agents.add",
+      expose: false,
     },
   },
 });

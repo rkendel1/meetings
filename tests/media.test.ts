@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import { createTestApp } from "@feltdb/feltkit/testing";
 import { api } from "../feltkit/_generated/api";
+import { registerAgents } from "./_org";
 
 const claude = { id: "claude", type: "agent" as const, displayName: "Claude", roles: ["agent"] };
 const code = (e: any) => e?.code;
@@ -31,6 +32,7 @@ test("a person in a live call gets short-lived relay credentials; the provider t
   process.env.TURN_API_URL = p.url;
   process.env.FELTKIT_CREDENTIAL_TURN = "provider-token-123";
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const m = await t.as("ada").mutation(api.meetings.create, { title: "Relay" });
     const a = await t.as("ada").mutation(api.calls.join, { code: m.code });
@@ -65,6 +67,7 @@ test("without a reachable TURN provider, a call still gets STUN (direct connecti
   process.env.TURN_API_URL = "http://127.0.0.1:9/v1/turn/keys/none";
   process.env.FELTKIT_CREDENTIAL_TURN = "x";
   const t = await createTestApp();
+  await registerAgents(t);
   try {
     const m = await t.as("ada").mutation(api.meetings.create, { title: "No relay" });
     const a = await t.as("ada").mutation(api.calls.join, { code: m.code });

@@ -1,6 +1,6 @@
 /** Meeting rules shared by the function modules. Not loaded as functions (leading underscore). */
 import { fail } from "@feltdb/feltkit";
-import { calls, entries, meetings } from "./app.js";
+import { calls, entries, meetings, orgAgents } from "./app.js";
 import { peers } from "./_presence.js";
 import { GRACE_MS, LIVE_MS, callState, endPeer, finishCall, isLive, settle, type CallState } from "./_presence.js";
 export { GRACE_MS, LIVE_MS, callState, endPeer, finishCall, isLive, settle, type CallState };
@@ -9,7 +9,7 @@ export const REACTIONS = ["👍", "👏", "😂", "🎉", "❤️", "🤔"] as c
 
 type Principal = { id: string; type: string; displayName?: string };
 export type LeftReason = "left" | "replaced" | "expired" | "removed" | "ended" | "session-ended";
-export type Meeting = { id: string; code: string; title: string; hostId: string; hostName: string; access: "link" | "invited"; invited: string[]; agents?: "approved" | "open"; scheduledFor?: number; createdAt: number };
+export type Meeting = { id: string; code: string; title: string; hostId: string; hostName: string; access: "link" | "invited"; invited: string[]; agents?: "approved" | "open"; scheduledFor?: number; previousMeetingId?: string; createdAt: number };
 export type Call = { id: string; meetingId: string; number: number; startedAt: number; endedAt?: number; open?: boolean; recording?: { by: string; byName: string; startedAt: number; stoppedAt?: number } };
 export type Peer = { id: string; meetingId: string; callId: string; principalId: string; name: string; kind: "person" | "agent"; joinedAt: number; lastSeenAt: number; leftAt?: number; leftReason?: LeftReason; sessionRef?: string; signalWindowAt?: number; signalCount?: number; mic: boolean; cam: boolean; screen: boolean; hand: boolean };
 
@@ -40,6 +40,22 @@ export function mayAttend(meeting: Meeting, principalId: string, kind: "person" 
   return meeting.access === "link" && (kind === "person" || meeting.agents === "open");
 }
 
+/** An external agent: a non-person principal holding the `agent` role (an API key or agent session), not one of the app's own agents. */
+export function isExternalAgent(p: { type: string; roles?: readonly string[] }): boolean {
+  return p.type !== "user" && Array.isArray(p.roles) && p.roles.includes("agent");
+}
+
+/**
+ * The organization decides which external agents attend its meetings: one that is not registered, or that an
+ * administrator disabled, is refused everything here (as if no meeting existed), whoever invited it.
+ */
+export async function requireStanding(ctx: any): Promise<void> {
+  const me = ctx.auth.requirePrincipal() as Principal & { roles?: string[] };
+  if (!isExternalAgent(me)) return;
+  const [row] = (await ctx.db.find(orgAgents, { principalId: me.id }, { limit: 1 })) as Array<{ status: string }>;
+  if (!row || row.status !== "active") fail("FORBIDDEN", "This agent is not one of this organization's active agents. An administrator registers it (orgagents.register).", { reason: "agent-not-registered" });
+}
+
 export async function byCode(ctx: any, code: string): Promise<Meeting | null> {
   const [meeting] = (await ctx.db.find(meetings, { code: code.trim().toLowerCase() }, { limit: 1 })) as Meeting[];
   return meeting ?? null;
@@ -48,6 +64,7 @@ export async function byCode(ctx: any, code: string): Promise<Meeting | null> {
 /** The meeting by code, if the caller may attend it. Unknown and forbidden look the same: a code is the secret. */
 export async function meetingFor(ctx: any, code: string): Promise<Meeting> {
   const me = ctx.auth.requirePrincipal() as Principal;
+  await requireStanding(ctx);
   const meeting = await byCode(ctx, code);
   if (!meeting || !mayAttend(meeting, me.id, kindOf(me))) fail("NOT_FOUND", "No meeting with that code, or you are not invited to it.");
   return meeting;
@@ -76,6 +93,7 @@ export function sessionRefOf(ctx: any): string | undefined {
 /** The caller's own connection, still in the call and still allowed in the meeting, or a refusal. */
 export async function ownPeer(ctx: any, peerId: string): Promise<Peer> {
   const me = ctx.auth.requirePrincipal() as Principal;
+  await requireStanding(ctx);
   const peer = (await ctx.db.get(peers, peerId)) as Peer | null;
   if (!peer || peer.principalId !== me.id) fail("NOT_FOUND", "That is not your connection to this call.");
   // A connection is kept alive only by the session that created it: another session of the same person
@@ -101,7 +119,7 @@ export async function mayReadCall(ctx: any, meeting: Meeting, call: Call, princi
 }
 
 /** Append to the meeting's timeline, ordered per meeting. */
-export async function append(ctx: any, meeting: Meeting, entry: { callId?: string; kind: "chat" | "caption" | "reaction" | "note" | "system"; text: string; author?: { id: string; name: string; kind: "person" | "agent" } }) {
+export async function append(ctx: any, meeting: Meeting, entry: { callId?: string; kind: "chat" | "caption" | "reaction" | "note" | "system" | "observation"; text: string; author?: { id: string; name: string; kind: "person" | "agent" } }) {
   const me = entry.author ?? (() => { const p = ctx.auth.requirePrincipal() as Principal; return { id: p.id, name: nameOf(p), kind: kindOf(p) }; })();
   const seq = await ctx.db.sequence(`meeting:${meeting.id}`);
   return ctx.db.insert(entries, {

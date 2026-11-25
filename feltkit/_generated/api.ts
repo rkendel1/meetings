@@ -8,11 +8,14 @@ import type * as app_module from "../app.js";
 import type * as assistant_module from "../assistant.js";
 import type * as calls_module from "../calls.js";
 import type * as chat_module from "../chat.js";
+import type * as continuity_module from "../continuity.js";
 import type * as decisions_module from "../decisions.js";
 import type * as inbox_module from "../inbox.js";
 import type * as maintenance_module from "../maintenance.js";
 import type * as media_module from "../media.js";
 import type * as meetings_module from "../meetings.js";
+import type * as observations_module from "../observations.js";
+import type * as orgagents_module from "../orgagents.js";
 import type * as recording_module from "../recording.js";
 import type * as search_module from "../search.js";
 import type * as settings_module from "../settings.js";
@@ -20,4 +23,4 @@ import type * as signals_module from "../signals.js";
 import type * as summaries_module from "../summaries.js";
 
 /** Typed references to every query and mutation. Type-only imports: no backend code reaches the browser. */
-export const api = createApi<{ "actions": typeof actions_module; "agents": typeof agents_module; "ai": typeof ai_module; "app": typeof app_module; "assistant": typeof assistant_module; "calls": typeof calls_module; "chat": typeof chat_module; "decisions": typeof decisions_module; "inbox": typeof inbox_module; "maintenance": typeof maintenance_module; "media": typeof media_module; "meetings": typeof meetings_module; "recording": typeof recording_module; "search": typeof search_module; "settings": typeof settings_module; "signals": typeof signals_module; "summaries": typeof summaries_module }>();
+export const api = createApi<{ "actions": typeof actions_module; "agents": typeof agents_module; "ai": typeof ai_module; "app": typeof app_module; "assistant": typeof assistant_module; "calls": typeof calls_module; "chat": typeof chat_module; "continuity": typeof continuity_module; "decisions": typeof decisions_module; "inbox": typeof inbox_module; "maintenance": typeof maintenance_module; "media": typeof media_module; "meetings": typeof meetings_module; "observations": typeof observations_module; "orgagents": typeof orgagents_module; "recording": typeof recording_module; "search": typeof search_module; "settings": typeof settings_module; "signals": typeof signals_module; "summaries": typeof summaries_module }>();

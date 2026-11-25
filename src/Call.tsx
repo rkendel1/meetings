@@ -3,11 +3,13 @@ import { useFeltKit, useMutation, useQueryState } from "@feltdb/feltkit/react";
 import { api } from "../feltkit/_generated/api";
 import { startRecorder, saveBlob, type Recorder } from "./recorder";
 import { Mesh } from "./rtc";
+import { CaptureDialog, ObservationLine } from "./Observe";
+import { OrgAgents } from "./AddAgent";
 import { clock, describe, navigate, retrying } from "./util";
 
 type Me = { id: string; name: string };
 type Peer = { id: string; callId: string; principalId: string; name: string; kind: "person" | "agent"; joinedAt: number; lastSeenAt: number; leftAt?: number; mic: boolean; cam: boolean; screen: boolean; hand: boolean };
-type Entry = { id: string; seq: number; kind: "chat" | "caption" | "reaction" | "note" | "system"; authorId: string; authorName: string; authorKind: "person" | "agent"; text: string; createdAt: number };
+type Entry = { id: string; seq: number; kind: "chat" | "caption" | "reaction" | "note" | "system" | "observation"; authorId: string; authorName: string; authorKind: "person" | "agent"; text: string; createdAt: number };
 type Recording = { by: string; byName: string; startedAt: number; stoppedAt?: number };
 type Joined = { peerId: string; callId: string; callNumber: number };
 
@@ -237,6 +239,7 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
   const [cam, setCam] = useState(props.initial.cam && Boolean(props.initial.stream));
   const [screen, setScreen] = useState<MediaStream | null>(null);
   const [hand, setHand] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const [panel, setPanel] = useState<"chat" | "records" | "captions" | "people" | "agents" | null>("chat");
   const [captionsOn, setCaptionsOn] = useState(false);
   const [interim, setInterim] = useState("");
@@ -582,7 +585,7 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
               ))}
               <button className="ghost" aria-label="Close panel" onClick={() => setPanel(null)}>×</button>
             </div>
-            {panel === "chat" && <ChatPanel code={code} entries={entries.filter((e) => e.kind === "chat" || e.kind === "note" || e.kind === "system")} onError={props.onError} />}
+            {panel === "chat" && <ChatPanel code={code} entries={entries.filter((e) => e.kind === "chat" || e.kind === "note" || e.kind === "system" || e.kind === "observation")} onError={props.onError} />}
             {panel === "records" && <Records code={code} onError={props.onError} />}
             {panel === "captions" && <Transcript entries={entries.filter((e) => e.kind === "caption")} supported={Boolean(SpeechRecognition)} on={captionsOn} toggle={() => setCaptionsOn(!captionsOn)} />}
             {panel === "people" && (
@@ -591,17 +594,19 @@ function Room(props: { code: string; me: Me; meeting: { title: string; code: str
                 <People peers={peers} me={joined.peerId} isHost={props.isHost} remotes={remotes} onRemove={(id) => void end({ code, peerId: id }).catch(props.onError)} />
               </>
             )}
-            {panel === "agents" && <AgentsPanel code={code} agents={agents} access={props.meeting.access} policy={props.meeting.agents ?? "approved"} />}
+            {panel === "agents" && <AgentsPanel code={code} agents={agents} access={props.meeting.access} policy={props.meeting.agents ?? "approved"} isHost={props.isHost} onError={props.onError} />}
           </aside>
         )}
       </div>
 
+      {capturing && <CaptureDialog code={code} onClose={() => setCapturing(false)} onError={props.onError} />}
       <div className="controls">
         <div className="controls-left muted small-text">{hands.length > 0 && `✋ ${hands.map((h) => h.name).join(", ")}`}</div>
         <div className="controls-mid">
           <button className={`round ${mic ? "" : "off"}`} onClick={toggleMic} disabled={!local.current.getAudioTracks().length} aria-label={mic ? "Mute" : "Unmute"} title={mic ? "Mute" : "Unmute"}>{mic ? <MicIcon /> : <MicOffIcon />}</button>
           <button className={`round ${cam ? "" : "off"}`} onClick={() => void toggleCam()} aria-label={cam ? "Turn camera off" : "Turn camera on"} title={cam ? "Camera off" : "Camera on"}>{cam ? <CamIcon /> : <CamOffIcon />}</button>
           <button className={`round ${screen ? "on" : ""}`} onClick={() => void toggleScreen()} aria-label={screen ? "Stop sharing" : "Share screen"} title={screen ? "Stop sharing" : "Share screen"}><ScreenIcon /></button>
+          <button className="round" onClick={() => setCapturing(true)} aria-label="Send an observation" title="Send an observation: capture a region of a screen into the meeting (xeet)">📷</button>
           <button className={`round ${hand ? "on" : ""}`} onClick={() => setHand(!hand)} aria-label={hand ? "Lower hand" : "Raise hand"} title={hand ? "Lower hand" : "Raise hand"}>✋</button>
           <Reactions code={code} onError={props.onError} />
           <button className={`round ${captionsOn ? "on" : ""}`} onClick={() => (SpeechRecognition ? setCaptionsOn(!captionsOn) : setPanel("captions"))} aria-label="Live captions" title={SpeechRecognition ? "Live captions" : "Live captions need Chrome or Edge"}>CC</button>
@@ -696,7 +701,7 @@ function ChatPanel({ code, entries, onError }: { code: string; entries: Entry[];
                 {e.kind === "note" && <span className="badge">Note</span>}
                 <span className="muted">{clock(e.createdAt)}</span>
               </div>
-              <div className="message-text">{e.text}</div>
+              {e.kind === "observation" ? <ObservationLine code={code} entryId={e.id} text={e.text} onError={onError} /> : <div className="message-text">{e.text}</div>}
             </div>
           ),
         )}
@@ -798,7 +803,7 @@ function AccessEditor({ code, meeting, onError }: { code: string; meeting: { acc
 }
 
 /** How an agent attends: MCP at this app's /mcp, with an agent session or API key. */
-function AgentsPanel({ code, agents, access, policy }: { code: string; agents: Peer[]; access: string; policy: string }) {
+function AgentsPanel({ code, agents, access, policy, isHost, onError }: { code: string; agents: Peer[]; access: string; policy: string; isHost: boolean; onError: (e: unknown) => void }) {
   const origin = location.origin;
   const steps = useMemo(
     () => [
@@ -810,6 +815,7 @@ function AgentsPanel({ code, agents, access, policy }: { code: string; agents: P
   );
   return (
     <div className="panel-body scroll">
+      <OrgAgents code={code} isHost={isHost} onError={onError} />
       <div className="panel-note stack">
         <p className="small-text">
           {agents.length ? `${agents.map((a) => a.name).join(", ")} ${agents.length === 1 ? "is" : "are"} attending.` : "No agents are attending."} Agents join as participants without media: they read the live transcript and chat, post messages, and leave notes for the recap. They never keep a call open on their own.
