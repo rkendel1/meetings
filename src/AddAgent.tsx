@@ -3,23 +3,49 @@
  * meeting and starts its execution under the organization's own delegation, in the agent's application. It never
  * grants the agent authority to act for anyone: repository changes and other consequential actions keep their own
  * grants and need a person's approval of the exact call.
+ *
+ * Administrators also get the registration form and the list of registered agents (AgentRegistry). The host of a
+ * meeting is not thereby an administrator: registering needs the agents.manage permission, which the server checks.
  */
 import { useState } from "react";
-import { useFeltKit, useQueryState } from "@feltdb/feltkit/react";
+import { useFeltKit, useQueryState, useSession } from "@feltdb/feltkit/react";
 import { api } from "../feltkit/_generated/api";
+import { AgentRegistry } from "./AgentRegistry";
+import { canManageAgents, whoRegistered } from "./agent-admin";
 
 const STATUS: Record<string, string> = { invited: "Invited", started: "Running · joining the meeting", failed: "Could not start", removed: "Removed" };
 
-/** Being invited is not enough: the server refuses every agent the organization has not registered (feltkit/_meeting.ts requireStanding). */
-function RegistrationNote() {
+/**
+ * Being invited is not enough: the server refuses every agent the organization has not registered (feltkit/_meeting.ts requireStanding).
+ * An administrator registers agents in the form above; everyone else is told who to ask.
+ */
+function RegistrationNote({ canManage, registrars }: { canManage: boolean; registrars: string[] }) {
+  if (canManage) {
+    return (
+      <p className="small-text warn-text">
+        An agent can attend only if it is registered as one of this organization's agents. Listing an id in People, or opening the meeting to agents, does not register it. Register it with the form above; it then appears in this list.
+      </p>
+    );
+  }
   return (
     <p className="small-text warn-text">
-      An agent can attend only if an administrator has registered its id as one of this organization's agents. Listing an id in People, or opening the meeting to agents, does not register it: an unregistered agent is refused with "not one of this organization's active agents". Ask an administrator to register it first (it then appears here).
+      An agent can attend only if an administrator has registered its id as one of this organization's agents. Listing an id in People, or opening the meeting to agents, does not register it: an unregistered agent is refused with "not one of this organization's active agents". Ask an administrator to register it first{registrars.length ? ` (${registrars.join(", ")} registered this organization's agents so far)` : ""}; it then appears here.
     </p>
   );
 }
 
 export function OrgAgents({ code, isHost, onError }: { code: string; isHost: boolean; onError: (e: unknown) => void }) {
+  const { session } = useSession();
+  const canManage = canManageAgents(session?.permissions);
+  return (
+    <>
+      {canManage && <AgentRegistry onError={onError} />}
+      <MeetingAgents code={code} isHost={isHost} canManage={canManage} onError={onError} />
+    </>
+  );
+}
+
+function MeetingAgents({ code, isHost, canManage, onError }: { code: string; isHost: boolean; canManage: boolean; onError: (e: unknown) => void }) {
   const agents = useQueryState(api.orgagents.forMeeting, { code });
   const client = useFeltKit();
   const [busy, setBusy] = useState<string | null>(null);
@@ -34,16 +60,17 @@ export function OrgAgents({ code, isHost, onError }: { code: string; isHost: boo
       setBusy(null);
     }
   };
+  const registrars = whoRegistered(agents.data ?? []);
   const list = (agents.data ?? []).filter((a: any) => a.status === "active");
   if (!list.length) return (
     <div className="stack">
-      <p className="small-text muted">This organization has no active agents. An administrator registers them.</p>
-      <RegistrationNote />
+      <p className="small-text muted">{canManage ? "This organization has no active agents. Register one with the form above." : "This organization has no active agents. An administrator registers them."}</p>
+      <RegistrationNote canManage={canManage} registrars={registrars} />
     </div>
   );
   return (
     <div className="stack">
-      <RegistrationNote />
+      <RegistrationNote canManage={canManage} registrars={registrars} />
       {list.map((a: any) => {
         const here = a.participation && a.participation.status !== "removed";
         return (
