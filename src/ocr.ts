@@ -6,6 +6,7 @@
  * macOS app records, and is never presented as one.
  */
 import { createWorker, PSM } from "tesseract.js";
+import { checkOcrAssets, withDeadline } from "./ocr-guard";
 
 /** The Tesseract build inside tesseract.js-core 7.0.0 (checked against the shipped core by scripts/vendor-ocr.mjs). */
 export const ENGINE = {
@@ -18,16 +19,36 @@ export const ENGINE = {
   unsupported: ["orientation detection (page segmentation mode 3 assumes upright text)", "handwriting", "accessibility tree (pixels only)"],
 };
 
-/** Tesseract's TSV reading of a PNG, recognized in the browser. */
+const START_MS = 30_000;
+const READ_MS = 90_000;
+
+/**
+ * Tesseract's TSV reading of a PNG, recognized in the browser. OCR is optional for the caller, so this must settle:
+ * it rejects at once when the engine's files are not served, and after a deadline when the engine hangs.
+ */
 export async function readText(png: Blob): Promise<string> {
   const base = `${location.origin}/ocr`;
-  const worker = await createWorker("eng", 1, { workerPath: `${base}/worker.min.js`, corePath: base, langPath: base, gzip: true, workerBlobURL: false });
+  await checkOcrAssets(base);
+  const starting = createWorker("eng", 1, { workerPath: `${base}/worker.min.js`, corePath: base, langPath: base, gzip: true, workerBlobURL: false });
+  let worker;
   try {
-    await worker.setParameters({ tessedit_pageseg_mode: PSM.AUTO });
-    const { data } = await worker.recognize(png, {}, { tsv: true });
-    if (typeof data.tsv !== "string" || !data.tsv.trim()) throw new Error("The OCR engine returned no reading.");
-    return data.tsv;
+    worker = await withDeadline(starting, START_MS, "Starting the OCR engine");
+  } catch (e) {
+    void starting.then((w) => w.terminate()).catch(() => {});
+    throw e;
+  }
+  try {
+    return await withDeadline(
+      (async () => {
+        await worker.setParameters({ tessedit_pageseg_mode: PSM.AUTO });
+        const { data } = await worker.recognize(png, {}, { tsv: true });
+        if (typeof data.tsv !== "string" || !data.tsv.trim()) throw new Error("The OCR engine returned no reading.");
+        return data.tsv;
+      })(),
+      READ_MS,
+      "Reading the text",
+    );
   } finally {
-    await worker.terminate();
+    void worker.terminate().catch(() => {});
   }
 }
